@@ -7,21 +7,10 @@ namespace ADGV
 {
     public partial class SetFilterForm : Form
     {
-        private enum FilterType
-        {
-            Unknown,
-            DateTime,
-            String,
-            Float,
-            Integer
-        }
-
-        private FilterType filterType = FilterType.Unknown;
+        private FilterDataType filterType;
         private ResourceManager RM = null;
         private Control val1contol = null;
         private Control val2contol = null;
-        private Boolean dateWithTime = true;
-        private Boolean timeFilter = false;
 
         public String FilterString
         {
@@ -44,62 +33,23 @@ namespace ADGV
             InitializeComponent();
         }
 
-        private String FormatString(String Text)
-        {
-            String result = "";
-            String s;
-            String[] replace = { "%", "[", "]", "*", "\"", "`", "\\" };
-
-            for (Int32 i = 0; i < Text.Length; i++)
-            {
-                s = Text[i].ToString();
-                if (replace.Contains(s))
-                    result += "[" + s + "]";
-                else
-                    result += s;
-            }
-
-            return result.Replace("'", "''");
-        }
-
-        public SetFilterForm(Type dataType, Boolean DateWithTime = true, Boolean TimeFilter = false)
+        public SetFilterForm(FilterDataType dataType)
             : this()
         {
-            if (dataType == typeof(DateTime))
-                this.filterType = FilterType.DateTime;
-            else if (dataType == typeof(Int32) || dataType == typeof(Int64) || dataType == typeof(Int16) ||
-                    dataType == typeof(UInt32) || dataType == typeof(UInt64) || dataType == typeof(UInt16) ||
-                    dataType == typeof(Byte) || dataType == typeof(SByte))
-                this.filterType = FilterType.Integer;
-            else if (dataType == typeof(Single) || dataType == typeof(Double) || dataType == typeof(Decimal))
-                this.filterType = FilterType.Float;
-            else if (dataType == typeof(String))
-                this.filterType = FilterType.String;
-            else
-                this.filterType = FilterType.Unknown;
-
-            this.dateWithTime = DateWithTime;
-            this.timeFilter = TimeFilter;
+            this.filterType = dataType;
+            
             switch (this.filterType)
             {
-                case FilterType.DateTime:
+                case FilterDataType.DateTime:
                     this.val1contol = new DateTimePicker();
                     this.val2contol = new DateTimePicker();
-                    if (this.timeFilter)
-                    {
-                        System.Globalization.DateTimeFormatInfo dt = System.Threading.Thread.CurrentThread.CurrentCulture.DateTimeFormat;
 
-                        (this.val1contol as DateTimePicker).CustomFormat = dt.ShortDatePattern + " " + dt.LongTimePattern;
-                        (this.val2contol as DateTimePicker).CustomFormat = dt.ShortDatePattern + " " + dt.LongTimePattern;
-                        (this.val1contol as DateTimePicker).Format = DateTimePickerFormat.Custom;
-                        (this.val2contol as DateTimePicker).Format = DateTimePickerFormat.Custom;
-                    }
-                    else
-                    {
-                        (this.val1contol as DateTimePicker).Format = DateTimePickerFormat.Short;
-                        (this.val2contol as DateTimePicker).Format = DateTimePickerFormat.Short;
-                    }
-
+                    System.Globalization.DateTimeFormatInfo dt = System.Threading.Thread.CurrentThread.CurrentCulture.DateTimeFormat;
+                    (this.val1contol as DateTimePicker).CustomFormat = dt.ShortDatePattern + " " + dt.LongTimePattern;
+                    (this.val2contol as DateTimePicker).CustomFormat = dt.ShortDatePattern + " " + dt.LongTimePattern;
+                    (this.val1contol as DateTimePicker).Format = DateTimePickerFormat.Custom;
+                    (this.val2contol as DateTimePicker).Format = DateTimePickerFormat.Custom;
+                    
                     this.FilterTypeComboBox.Items.AddRange(new String[] {
                         this.RM.GetString("setfilterform_filtertypecombobox_equal"),
                         this.RM.GetString("setfilterform_filtertypecombobox_notequal"),
@@ -109,8 +59,8 @@ namespace ADGV
                     });
                     break;
 
-                case FilterType.Integer:
-                case FilterType.Float:
+                case FilterDataType.Int:
+                case FilterDataType.Float:
                     this.val1contol = new TextBox();
                     this.val2contol = new TextBox();
                     this.val1contol.TextChanged += eControlTextChanged;
@@ -192,42 +142,24 @@ namespace ADGV
             }
 
             String column = "[{0}] ";
-
-            if (this.filterType == FilterType.Unknown)
-                column = "Convert([{0}],System.String) ";
-
             this.filterString = column;
 
             switch (this.filterType)
             {
-                case FilterType.DateTime:
+                case FilterDataType.DateTime:
                     DateTime dt = ((DateTimePicker)this.val1contol).Value;
 
                     if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_equal"))
                     {
-                        if (this.dateWithTime)
-                        {
-                            if (this.timeFilter)
-                                this.filterString += "= '" + dt.ToString("o") + "'";
-                            else
-                                this.filterString = "Convert([{0}], System.String) LIKE '" + dt.ToShortDateString() + "%'";
-                        }
-                        else
-                            this.filterString += "= '" + dt.ToShortDateString() + "'";
+                        this.filterString += "= '" + dt.ToString("o") + "'";
                     }
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_before"))
                     {
-                        if (this.timeFilter)
-                            this.filterString += "< '" + dt.ToString("o") + "'";
-                        else
-                            this.filterString += "< '" + dt.ToShortDateString() + "'";
+                        this.filterString += "< '" + dt.ToString("o") + "'";
                     }
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_after"))
                     {
-                        if (this.timeFilter)
-                            this.filterString += "> '" + dt.ToString("o") + "'";
-                        else
-                            this.filterString += "> '" + dt.ToShortDateString() + "'";
+                        this.filterString += "> '" + dt.ToString("o") + "'";
                     }
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_between"))
                     {
@@ -238,46 +170,25 @@ namespace ADGV
                             dt = dt1;
                             dt1 = d;
                         }
-                        if (this.timeFilter)
-                        {
-                            this.filterString += ">= '" + dt.ToString("o") + "'";
-                            this.filterString += " AND " + column + "<= '" + dt1.ToString("o") + "'";
-                        }
-                        else
-                        {
-                            this.filterString += ">= '" + dt.ToShortDateString() + "'";
-                            this.filterString += " AND " + column + "<= '" + dt1.ToShortDateString() + "'";
-                        }
+                        this.filterString += ">= '" + dt.ToString("o") + "'";
+                        this.filterString += " AND " + column + "<= '" + dt1.ToString("o") + "'";
                     }
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_notequal"))
                     {
-                        if (this.dateWithTime)
-                        {
-                            if (this.timeFilter)
-                                this.filterString += "<> '" + dt.ToString("o") + "'";
-                            else
-                                this.filterString = "Convert([{0}], System.String) NOT LIKE '" + dt.ToShortDateString() + "%'";
-                        }
-                        else
-                            this.filterString += "<> '" + dt.ToShortDateString() + "'";
+                        this.filterString += "<> '" + dt.ToString("o") + "'";
                     }
                     break;
 
-                case FilterType.Integer:
-                case FilterType.Float:
+                case FilterDataType.Int:
+                case FilterDataType.Float:
 
-                    String num = this.val1contol.Text;
-
-                    if (this.filterType == FilterType.Float)
-                        num = num.Replace(",", ".");
+                    String num = this.val1contol.Text.Replace(",", ".");
 
                     if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_equal"))
                         this.filterString += "= " + num;
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_between"))
                     {
-                        String num1 = this.val2contol.Text;
-                        if (this.filterType == FilterType.Float)
-                            num1 = num1.Replace(",", ".");
+                        String num1 = this.val2contol.Text.Replace(",", ".");
 
                         if (Double.Parse(num) > Double.Parse(num1))
                         {
@@ -300,7 +211,7 @@ namespace ADGV
                     break;
 
                 default:
-                    String txt = this.FormatString(this.val1contol.Text);
+                    String txt = this.val1contol.Text.Replace("'", "''").Replace("{", "{{").Replace("}", "}}");
                     if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_equal"))
                         this.filterString += "LIKE '" + txt + "'";
                     else if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_notequal"))
@@ -331,10 +242,8 @@ namespace ADGV
             {
                 this.filterString = null;
                 this.viewfilterString = null;
-                this.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+                this.okButton.Enabled = false;
             }
-
-            this.Close();
         }
 
         private void FilterTypeComboBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -352,12 +261,12 @@ namespace ADGV
             Boolean hasErrors = false;
             switch (this.filterType)
             {
-                case FilterType.Integer:
+                case FilterDataType.Int:
                     Int64 val;
                     hasErrors = !(Int64.TryParse((sender as TextBox).Text, out val));
                     break;
 
-                case FilterType.Float:
+                case FilterDataType.Float:
                     Double val1;
                     hasErrors = !(Double.TryParse((sender as TextBox).Text, out val1));
                     break;

@@ -31,30 +31,6 @@ namespace ADGV
             }
         }
 
-        public Boolean DateWithTime
-        {
-            get
-            {
-                return this.dateWithTime;
-            }
-            set
-            {
-                this.dateWithTime = value;
-            }
-        }
-
-        public Boolean TimeFilter
-        {
-            get
-            {
-                return this.timeFilter;
-            }
-            set
-            {
-                this.timeFilter = value;
-            }
-        }
-
         public event EventHandler SortStringChanged;
 
         public event EventHandler FilterStringChanged;
@@ -117,8 +93,6 @@ namespace ADGV
         {
             e.Column.SortMode = DataGridViewColumnSortMode.Programmatic;
             ADGVColumnHeaderCell cell = new ADGVColumnHeaderCell(e.Column.HeaderCell, this.AutoGenerateContextFilters);
-            cell.DateWithTime = this.DateWithTime;
-            cell.TimeFilter = this.TimeFilter;
             cell.SortChanged += new ADGVFilterEventHandler(eSortChanged);
             cell.FilterChanged += new ADGVFilterEventHandler(eFilterChanged);
             cell.FilterPopup += new ADGVFilterEventHandler(eFilterPopup);
@@ -128,6 +102,7 @@ namespace ADGV
             e.Column.HeaderCell = cell;
 
             base.OnColumnAdded(e);
+
         }
 
         protected override void OnColumnRemoved(DataGridViewColumnEventArgs e)
@@ -278,26 +253,12 @@ namespace ADGV
         {
             if (this.Columns.Contains(Column))
             {
-                ADGVColumnHeaderCell c = Column.HeaderCell as ADGVColumnHeaderCell;
-                if (c != null)
-                    this.EnableFilter(Column, c.DateWithTime, c.TimeFilter);
-                else
-                    this.EnableFilter(Column, this.DateWithTime, this.TimeFilter);
-            }
-        }
-
-        public void EnableFilter(DataGridViewColumn Column, Boolean DateWithTime, Boolean TimeFilter)
-        {
-            if (this.Columns.Contains(Column))
-            {
                 ADGVColumnHeaderCell cell = Column.HeaderCell as ADGVColumnHeaderCell;
                 if (cell != null)
                 {
-                    if (cell.DateWithTime != DateWithTime || cell.TimeFilter != TimeFilter || (!cell.FilterEnabled && (cell.FilterString.Length > 0 || cell.SortString.Length > 0)))
+                    if (!cell.FilterEnabled && (cell.FilterString.Length > 0 || cell.SortString.Length > 0))
                         this.ClearFilter(true);
 
-                    cell.DateWithTime = DateWithTime;
-                    cell.TimeFilter = TimeFilter;
                     cell.FilterEnabled = true;
                     this.readyToShowFilters.Remove(Column.Name);
                 }
@@ -305,8 +266,6 @@ namespace ADGV
                 {
                     Column.SortMode = DataGridViewColumnSortMode.Programmatic;
                     cell = new ADGVColumnHeaderCell(Column.HeaderCell, true);
-                    cell.DateWithTime = this.DateWithTime;
-                    cell.TimeFilter = this.TimeFilter;
                     cell.SortChanged += new ADGVFilterEventHandler(eSortChanged);
                     cell.FilterChanged += new ADGVFilterEventHandler(eFilterChanged);
                     cell.FilterPopup += new ADGVFilterEventHandler(eFilterPopup);

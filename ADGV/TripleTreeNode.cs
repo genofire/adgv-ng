@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
+using System.Linq;
 
 namespace ADGV
 {
@@ -21,6 +23,19 @@ namespace ADGV
     {
         private CheckState checkState = CheckState.Unchecked;
         private TripleTreeNode parent;
+
+        public List<TripleTreeNode> AllNodes
+        {
+            get {
+                List<TripleTreeNode> nodes = new List<TripleTreeNode>();
+                nodes.Add(this);
+                
+                if (this.Nodes.Count > 0)
+                    nodes.AddRange(this.Nodes.Cast<TripleTreeNode>().SelectMany(n => n.AllNodes));
+                
+                return nodes;
+            }
+        }
 
         public TripleTreeNodeType NodeType { get; private set; }
 

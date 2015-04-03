@@ -221,14 +221,12 @@
             this.dataGridView.AutoGenerateContextFilters = true;
             this.dataGridView.ColumnHeadersHeight = 22;
             this.dataGridView.DataSource = this.bindingSource;
-            this.dataGridView.DateWithTime = true;
             this.dataGridView.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dataGridView.Location = new System.Drawing.Point(0, 67);
             this.dataGridView.Name = "dataGridView";
             this.dataGridView.ReadOnly = true;
             this.dataGridView.Size = new System.Drawing.Size(867, 275);
             this.dataGridView.TabIndex = 2;
-            this.dataGridView.TimeFilter = false;
             this.dataGridView.SortStringChanged += new System.EventHandler(this.dataGridView_SortStringChanged);
             this.dataGridView.FilterStringChanged += new System.EventHandler(this.dataGridView_FilterStringChanged);
             this.dataGridView.CellMouseDown += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.dataGridView_CellMouseDown);

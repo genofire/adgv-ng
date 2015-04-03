@@ -17,11 +17,11 @@ namespace ADGV
 
         public ADGVFilterMenu FilterMenu { get; private set; }
 
-        public event ADGVFilterEventHandler FilterPopup;
+        public event ADGVFilterEventHandler FilterPopup = delegate { };
 
-        public event ADGVFilterEventHandler SortChanged;
+        public event ADGVFilterEventHandler SortChanged = delegate { };
 
-        public event ADGVFilterEventHandler FilterChanged;
+        public event ADGVFilterEventHandler FilterChanged = delegate { };
 
         public Size MinimumSize
         {
@@ -107,30 +107,6 @@ namespace ADGV
                     if (!refreshed)
                         this.RepaintCell();
                 }
-            }
-        }
-
-        public Boolean DateWithTime
-        {
-            get
-            {
-                return this.FilterMenu.DateWithTime;
-            }
-            set
-            {
-                this.FilterMenu.DateWithTime = value;
-            }
-        }
-
-        public Boolean TimeFilter
-        {
-            get
-            {
-                return this.FilterMenu.TimeFilter;
-            }
-            set
-            {
-                this.FilterMenu.TimeFilter = value;
             }
         }
 
@@ -238,7 +214,7 @@ namespace ADGV
         {
             RefreshImage();
             this.RepaintCell();
-            if (this.FilterEnabled && this.FilterChanged != null)
+            if (this.FilterEnabled)
                 this.FilterChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
         }
 
@@ -246,7 +222,7 @@ namespace ADGV
         {
             RefreshImage();
             this.RepaintCell();
-            if (this.FilterEnabled && this.SortChanged != null)
+            if (this.FilterEnabled)
                 this.SortChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
         }
 
@@ -333,7 +309,7 @@ namespace ADGV
                     this.filterButtonPressed = false;
                     this.filterButtonOver = false;
                     this.RepaintCell();
-                    if (this.filterButtonImageBounds.Contains(e.X, e.Y) && this.FilterPopup != null)
+                    if (this.filterButtonImageBounds.Contains(e.X, e.Y))
                     {
                         this.FilterPopup(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
                     }
@@ -356,9 +332,12 @@ namespace ADGV
 
         public void SetLoadedFilterMode(Boolean Enabled)
         {
-            this.FilterMenu.SetLoadedFilterMode(Enabled);
-            this.RefreshImage();
-            this.RepaintCell();
+            if (this.FilterMenu != null)
+            {
+                this.FilterMenu.SetLoadedFilterMode(Enabled);
+                this.RefreshImage();
+                this.RepaintCell();
+            }
         }
     }
 

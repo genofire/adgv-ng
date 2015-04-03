@@ -20,8 +20,8 @@ namespace ADGVSample
         {
             InitializeComponent();
             this.dataGridView.AutoGenerateColumns = true;
-            this.toolStripButton2.Checked = this.dataGridView.DateWithTime;
-            this.toolStripButton1.Checked = this.dataGridView.TimeFilter;
+//            this.toolStripButton2.Checked = this.dataGridView.DateWithTime;
+  //          this.toolStripButton1.Checked = this.dataGridView.TimeFilter;
             AddData();
         }
 
@@ -133,14 +133,14 @@ namespace ADGVSample
 
         private void toolStripButton2_Click(object sender, EventArgs e)
         {
-            this.dataGridView.DateWithTime = !this.dataGridView.DateWithTime;
-            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"], this.dataGridView.DateWithTime, this.dataGridView.TimeFilter);
+      //      this.dataGridView.DateWithTime = !this.dataGridView.DateWithTime;
+            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"]);
         }
 
         private void toolStripButton1_Click(object sender, EventArgs e)
         {
-            this.dataGridView.TimeFilter = !this.dataGridView.TimeFilter;
-            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"], this.dataGridView.DateWithTime, this.dataGridView.TimeFilter);
+//            this.dataGridView.TimeFilter = !this.dataGridView.TimeFilter;
+            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"]);
         }
 
         private void toolStripButton3_Click(object sender, EventArgs e)
