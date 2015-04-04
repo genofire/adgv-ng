@@ -19,6 +19,26 @@ namespace ADGV
         private Boolean timeFilter = false;
         private Boolean loadedFilter = false;
 
+        public FilterDateTimeGrouping DateTimeGrouping
+        {
+            get
+            {
+                foreach (var m in this.filterCells)
+                    return m.DateTimeGrouping;
+
+                return FilterDateTimeGrouping.Second;
+            }
+            set
+            {
+                if (this.DateTimeGrouping != value)
+                {
+                    foreach (var m in filterCells)
+                        m.DateTimeGrouping = value;
+                }
+            }
+        }
+
+
         public Boolean AutoGenerateContextFilters
         {
             get
@@ -96,6 +116,7 @@ namespace ADGV
             cell.SortChanged += new ADGVFilterEventHandler(eSortChanged);
             cell.FilterChanged += new ADGVFilterEventHandler(eFilterChanged);
             cell.FilterPopup += new ADGVFilterEventHandler(eFilterPopup);
+            cell.DateTimeGrouping = this.DateTimeGrouping;
             e.Column.MinimumWidth = cell.MinimumSize.Width;
             if (this.ColumnHeadersHeight < cell.MinimumSize.Height)
                 this.ColumnHeadersHeight = cell.MinimumSize.Height;

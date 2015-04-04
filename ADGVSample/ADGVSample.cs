@@ -20,8 +20,13 @@ namespace ADGVSample
         {
             InitializeComponent();
             this.dataGridView.AutoGenerateColumns = true;
-//            this.toolStripButton2.Checked = this.dataGridView.DateWithTime;
-  //          this.toolStripButton1.Checked = this.dataGridView.TimeFilter;
+
+            foreach(var tg in Enum.GetValues(typeof(FilterDateTimeGrouping)))
+            {
+                this.timeGroupingComboBox.Items.Add(tg);
+            }
+            
+            this.timeGroupingComboBox.SelectedItem = this.dataGridView.DateTimeGrouping;
             AddData();
         }
 
@@ -168,9 +173,9 @@ namespace ADGVSample
             this.dataGridView.LoadFilter(filters[i], sort[i]);
         }
 
-        private void dataGridView_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        private void timeGroupingComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-
+            this.dataGridView.DateTimeGrouping = (FilterDateTimeGrouping)this.timeGroupingComboBox.SelectedItem;
         }
     }
 }
