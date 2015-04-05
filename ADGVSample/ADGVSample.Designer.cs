@@ -29,15 +29,16 @@
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.searchButton = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripButton3 = new System.Windows.Forms.ToolStripButton();
-            this.hideColumnButton = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripDropDownButton1 = new System.Windows.Forms.ToolStripDropDownButton();
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStrip = new System.Windows.Forms.ToolStrip();
-            this.timeGroupingComboBox = new System.Windows.Forms.ToolStripComboBox();
+            this.columnComboBox = new System.Windows.Forms.ToolStripComboBox();
+            this.toolStripLabel1 = new System.Windows.Forms.ToolStripLabel();
+            this.behaviorComboBox = new System.Windows.Forms.ToolStripComboBox();
             this.dateTimeGroupingLabel = new System.Windows.Forms.ToolStripLabel();
+            this.timeGroupingComboBox = new System.Windows.Forms.ToolStripComboBox();
             this.statusStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.bindingSource)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataSet)).BeginInit();
@@ -51,7 +52,7 @@
             this.toolStripStatusLabel1});
             this.statusStrip.Location = new System.Drawing.Point(0, 342);
             this.statusStrip.Name = "statusStrip";
-            this.statusStrip.Size = new System.Drawing.Size(867, 22);
+            this.statusStrip.Size = new System.Drawing.Size(987, 22);
             this.statusStrip.TabIndex = 1;
             this.statusStrip.Text = "statusStrip1";
             // 
@@ -76,14 +77,12 @@
             this.dataGridView.AllowUserToDeleteRows = false;
             this.dataGridView.AllowUserToOrderColumns = true;
             this.dataGridView.AutoGenerateColumns = false;
-            this.dataGridView.AutoGenerateContextFilters = true;
             this.dataGridView.ColumnHeadersHeight = 22;
             this.dataGridView.DataSource = this.bindingSource;
-            this.dataGridView.DateTimeGrouping = ADGV.FilterDateTimeGrouping.Second;
             this.dataGridView.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dataGridView.Location = new System.Drawing.Point(0, 67);
             this.dataGridView.Name = "dataGridView";
-            this.dataGridView.Size = new System.Drawing.Size(867, 275);
+            this.dataGridView.Size = new System.Drawing.Size(987, 275);
             this.dataGridView.TabIndex = 2;
             this.dataGridView.SortStringChanged += new System.EventHandler(this.dataGridView_SortStringChanged);
             this.dataGridView.FilterStringChanged += new System.EventHandler(this.dataGridView_FilterStringChanged);
@@ -97,7 +96,7 @@
             this.searchToolBar.MinimumSize = new System.Drawing.Size(0, 27);
             this.searchToolBar.Name = "searchToolBar";
             this.searchToolBar.RenderMode = System.Windows.Forms.ToolStripRenderMode.Professional;
-            this.searchToolBar.Size = new System.Drawing.Size(867, 27);
+            this.searchToolBar.Size = new System.Drawing.Size(987, 27);
             this.searchToolBar.TabIndex = 3;
             this.searchToolBar.Text = "searchToolBar1";
             this.searchToolBar.Search += new ADGV.SearchToolBarSearchEventHandler(this.searchToolBar_Search);
@@ -141,30 +140,6 @@
             this.toolStripSeparator4.Name = "toolStripSeparator4";
             this.toolStripSeparator4.Size = new System.Drawing.Size(6, 40);
             // 
-            // toolStripButton3
-            // 
-            this.toolStripButton3.Checked = true;
-            this.toolStripButton3.CheckOnClick = true;
-            this.toolStripButton3.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton3.Name = "toolStripButton3";
-            this.toolStripButton3.Size = new System.Drawing.Size(107, 37);
-            this.toolStripButton3.Text = "Enabled \"int\" filter";
-            this.toolStripButton3.Click += new System.EventHandler(this.toolStripButton3_Click);
-            // 
-            // hideColumnButton
-            // 
-            this.hideColumnButton.Checked = true;
-            this.hideColumnButton.CheckOnClick = true;
-            this.hideColumnButton.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.hideColumnButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.hideColumnButton.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.hideColumnButton.Name = "hideColumnButton";
-            this.hideColumnButton.Size = new System.Drawing.Size(145, 37);
-            this.hideColumnButton.Text = "Visible \"boolean\" column";
-            this.hideColumnButton.Click += new System.EventHandler(this.hideColumnButton_Click);
-            // 
             // toolStripSeparator2
             // 
             this.toolStripSeparator2.Name = "toolStripSeparator2";
@@ -203,8 +178,9 @@
             this.toolStripSeparator1,
             this.searchButton,
             this.toolStripSeparator4,
-            this.toolStripButton3,
-            this.hideColumnButton,
+            this.columnComboBox,
+            this.toolStripLabel1,
+            this.behaviorComboBox,
             this.dateTimeGroupingLabel,
             this.timeGroupingComboBox,
             this.toolStripSeparator2,
@@ -212,9 +188,37 @@
             this.toolStrip.Location = new System.Drawing.Point(0, 0);
             this.toolStrip.Name = "toolStrip";
             this.toolStrip.RenderMode = System.Windows.Forms.ToolStripRenderMode.System;
-            this.toolStrip.Size = new System.Drawing.Size(867, 40);
+            this.toolStrip.Size = new System.Drawing.Size(987, 40);
             this.toolStrip.TabIndex = 0;
             this.toolStrip.Text = "toolStrip1";
+            // 
+            // columnComboBox
+            // 
+            this.columnComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.columnComboBox.MaxDropDownItems = 20;
+            this.columnComboBox.Name = "columnComboBox";
+            this.columnComboBox.Size = new System.Drawing.Size(121, 40);
+            this.columnComboBox.SelectedIndexChanged += new System.EventHandler(this.columnComboBox_SelectedIndexChanged);
+            // 
+            // toolStripLabel1
+            // 
+            this.toolStripLabel1.Name = "toolStripLabel1";
+            this.toolStripLabel1.Size = new System.Drawing.Size(56, 37);
+            this.toolStripLabel1.Text = "Behavior:";
+            // 
+            // behaviorComboBox
+            // 
+            this.behaviorComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.behaviorComboBox.MaxDropDownItems = 20;
+            this.behaviorComboBox.Name = "behaviorComboBox";
+            this.behaviorComboBox.Size = new System.Drawing.Size(121, 40);
+            this.behaviorComboBox.SelectedIndexChanged += new System.EventHandler(this.behaviorComboBox_SelectedIndexChanged);
+            // 
+            // dateTimeGroupingLabel
+            // 
+            this.dateTimeGroupingLabel.Name = "dateTimeGroupingLabel";
+            this.dateTimeGroupingLabel.Size = new System.Drawing.Size(111, 37);
+            this.dateTimeGroupingLabel.Text = "DateTimeGrouping:";
             // 
             // timeGroupingComboBox
             // 
@@ -224,17 +228,11 @@
             this.timeGroupingComboBox.Size = new System.Drawing.Size(121, 40);
             this.timeGroupingComboBox.SelectedIndexChanged += new System.EventHandler(this.timeGroupingComboBox_SelectedIndexChanged);
             // 
-            // dateTimeGroupingLabel
-            // 
-            this.dateTimeGroupingLabel.Name = "dateTimeGroupingLabel";
-            this.dateTimeGroupingLabel.Size = new System.Drawing.Size(111, 37);
-            this.dateTimeGroupingLabel.Text = "DateTimeGrouping:";
-            // 
             // ADGVSample
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(867, 364);
+            this.ClientSize = new System.Drawing.Size(987, 364);
             this.Controls.Add(this.dataGridView);
             this.Controls.Add(this.searchToolBar);
             this.Controls.Add(this.toolStrip);
@@ -266,8 +264,6 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton searchButton;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
-        private System.Windows.Forms.ToolStripButton toolStripButton3;
-        private System.Windows.Forms.ToolStripButton hideColumnButton;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
         private System.Windows.Forms.ToolStripDropDownButton toolStripDropDownButton1;
         private System.Windows.Forms.ToolStripMenuItem toolStripMenuItem1;
@@ -275,6 +271,9 @@
         private System.Windows.Forms.ToolStrip toolStrip;
         private System.Windows.Forms.ToolStripComboBox timeGroupingComboBox;
         private System.Windows.Forms.ToolStripLabel dateTimeGroupingLabel;
+        private System.Windows.Forms.ToolStripComboBox columnComboBox;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel1;
+        private System.Windows.Forms.ToolStripComboBox behaviorComboBox;
     }
 }
 

@@ -8,52 +8,22 @@ namespace ADGV
 {
     public class AdvancedDataGridView : DataGridView
     {
-        private List<String> sortOrder = new List<String>();
-        private List<String> filterOrder = new List<String>();
-        private List<String> readyToShowFilters = new List<String>();
+        private List<string> sortOrder = new List<String>();
+        private List<string> filterOrder = new List<String>();
+        private List<string> readyToShowFilters = new List<String>();
 
-        private String sortString = null;
-        private String filterString = null;
-        private Boolean atoGenerateContextFilters = true;
-        private Boolean dateWithTime = false;
-        private Boolean timeFilter = false;
-        private Boolean loadedFilter = false;
+        private string sortString = null;
+        private string filterString = null;
 
-        public FilterDateTimeGrouping DateTimeGrouping
-        {
-            get
-            {
-                foreach (var m in this.filterCells)
-                    return m.DateTimeGrouping;
+        private bool loadedFilter = false;
 
-                return FilterDateTimeGrouping.Second;
-            }
-            set
-            {
-                if (this.DateTimeGrouping != value)
-                {
-                    foreach (var m in filterCells)
-                        m.DateTimeGrouping = value;
-                }
-            }
-        }
+        public FilterDateTimeGrouping DefaultDateTimeGrouping {get; set;}
 
+        public ADGVColumnHeaderCellBehavior DefaultCellBehavior {get; set;}
 
-        public Boolean AutoGenerateContextFilters
-        {
-            get
-            {
-                return this.atoGenerateContextFilters;
-            }
-            set
-            {
-                this.atoGenerateContextFilters = value;
-            }
-        }
+        public event EventHandler SortStringChanged = delegate { };
 
-        public event EventHandler SortStringChanged;
-
-        public event EventHandler FilterStringChanged;
+        public event EventHandler FilterStringChanged = delegate { };
 
         private IEnumerable<ADGVColumnHeaderCell> filterCells
         {
@@ -65,58 +35,61 @@ namespace ADGV
             }
         }
 
-        public String SortString
+        public string SortString
         {
             get
             {
-                return this.sortString == null ? "" : this.sortString;
+                return String.IsNullOrWhiteSpace(this.sortString) ? "" : this.sortString;
             }
             private set
             {
-                String old = value;
-                if (old != this.sortString)
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
+
+                if (value != this.sortString)
                 {
                     this.sortString = value;
                     if (this.SortedColumn != null)
-                    {
                         this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
-                    }
-                    if (this.SortStringChanged != null)
-                        SortStringChanged(this, new EventArgs());
+
+                    this.SortStringChanged(this, new EventArgs());
                 }
             }
         }
 
-        public String FilterString
+        public string FilterString
         {
             get
             {
-                return this.filterString == null ? "" : this.filterString;
+                return String.IsNullOrWhiteSpace(this.filterString) ? "" : this.filterString;
             }
             private set
             {
-                String old = value;
-                if (old != this.filterString)
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
+
+                if (value != this.filterString)
                 {
                     this.filterString = value;
-                    if (this.FilterStringChanged != null)
-                        FilterStringChanged(this, new EventArgs());
+                    this.FilterStringChanged(this, new EventArgs());
                 }
             }
         }
 
         public AdvancedDataGridView()
         {
+            this.DefaultCellBehavior = ADGVColumnHeaderCellBehavior.SortingFiltering;
+            this.DefaultDateTimeGrouping = FilterDateTimeGrouping.Second;
         }
 
         protected override void OnColumnAdded(DataGridViewColumnEventArgs e)
         {
             e.Column.SortMode = DataGridViewColumnSortMode.Programmatic;
-            ADGVColumnHeaderCell cell = new ADGVColumnHeaderCell(e.Column.HeaderCell, this.AutoGenerateContextFilters);
+            ADGVColumnHeaderCell cell = new ADGVColumnHeaderCell(e.Column.HeaderCell, this.DefaultCellBehavior);
             cell.SortChanged += new ADGVFilterEventHandler(eSortChanged);
             cell.FilterChanged += new ADGVFilterEventHandler(eFilterChanged);
             cell.FilterPopup += new ADGVFilterEventHandler(eFilterPopup);
-            cell.DateTimeGrouping = this.DateTimeGrouping;
+            cell.DateTimeGrouping = this.DefaultDateTimeGrouping;
             e.Column.MinimumWidth = cell.MinimumSize.Width;
             if (this.ColumnHeadersHeight < cell.MinimumSize.Height)
                 this.ColumnHeadersHeight = cell.MinimumSize.Height;
@@ -164,21 +137,18 @@ namespace ADGV
         {
             if (this.Columns.Contains(e.Column))
             {
-                ADGVFilterMenu FilterMenu = e.FilterMenu;
-                DataGridViewColumn Column = e.Column;
+                System.Drawing.Rectangle rect = this.GetCellDisplayRectangle(e.Column.Index, -1, true);
 
-                System.Drawing.Rectangle rect = this.GetCellDisplayRectangle(Column.Index, -1, true);
-
-                if (this.readyToShowFilters.Contains(Column.Name))
-                    FilterMenu.Show(this, rect.Left, rect.Bottom, false);
+                if (this.readyToShowFilters.Contains(e.Column.Name))
+                    e.FilterMenu.Show(this, rect.Left, rect.Bottom, false);
                 else
                 {
-                    this.readyToShowFilters.Add(Column.Name);
+                    this.readyToShowFilters.Add(e.Column.Name);
 
-                    if (filterOrder.Count() > 0 && filterOrder.Last() == Column.Name)
-                        FilterMenu.Show(this, rect.Left, rect.Bottom, true);
+                    if (filterOrder.Count() > 0 && filterOrder.Last() == e.Column.Name)
+                        e.FilterMenu.Show(this, rect.Left, rect.Bottom, true);
                     else
-                        FilterMenu.Show(this, rect.Left, rect.Bottom, ADGVFilterMenu.GetValuesForFilter(this, Column.Name));
+                        e.FilterMenu.Show(this, rect.Left, rect.Bottom, ADGVFilterMenu.GetValuesForFilter(this, e.Column.Name));
                 }
             }
         }
@@ -187,19 +157,16 @@ namespace ADGV
         {
             if (this.Columns.Contains(e.Column))
             {
-                ADGVFilterMenu FilterMenu = e.FilterMenu;
-                DataGridViewColumn Column = e.Column;
-
-                this.filterOrder.Remove(Column.Name);
-                if (FilterMenu.ActiveFilterType != ADGVFilterMenuFilterType.None)
-                    this.filterOrder.Add(Column.Name);
+                this.filterOrder.Remove(e.Column.Name);
+                if (e.FilterMenu.ActiveFilterType != FilterMenuFilterType.None)
+                    this.filterOrder.Add(e.Column.Name);
 
                 this.FilterString = CreateFilterString();
 
                 if (this.loadedFilter)
                 {
                     this.loadedFilter = false;
-                    foreach (ADGVColumnHeaderCell c in this.filterCells.Where(f => f.FilterMenu != FilterMenu))
+                    foreach (ADGVColumnHeaderCell c in this.filterCells.Where(f => f.FilterMenu != e.FilterMenu))
                         c.SetLoadedFilterMode(false);
                 }
             }
@@ -209,12 +176,11 @@ namespace ADGV
         {
             if (this.Columns.Contains(e.Column))
             {
-                ADGVFilterMenu FilterMenu = e.FilterMenu;
-                DataGridViewColumn Column = e.Column;
+                this.sortOrder.Remove(e.Column.Name);
+                
+                if (e.FilterMenu.ActiveSortType != FilterMenuSortType.None)
+                    this.sortOrder.Add(e.Column.Name);
 
-                this.sortOrder.Remove(Column.Name);
-                if (FilterMenu.ActiveSortType != ADGVFilterMenuSortType.None)
-                    this.sortOrder.Add(Column.Name);
                 this.SortString = CreateSortString();
             }
         }
@@ -222,80 +188,181 @@ namespace ADGV
         private String CreateFilterString()
         {
             StringBuilder sb = new StringBuilder("");
-            String appx = "";
 
-            foreach (String name in this.filterOrder)
+            foreach (string name in this.filterOrder)
             {
-                DataGridViewColumn Column = this.Columns[name];
+                DataGridViewColumn column = this.Columns[name];
 
-                if (Column != null)
+                if (column != null)
                 {
-                    ADGVColumnHeaderCell cell = Column.HeaderCell as ADGVColumnHeaderCell;
-                    if (cell != null)
+                    ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+                    if (cell != null && cell.ActiveFilterType != FilterMenuFilterType.None)
                     {
-                        if (cell.FilterEnabled && cell.ActiveFilterType != ADGVFilterMenuFilterType.None)
-                        {
-                            sb.AppendFormat(appx + "(" + cell.FilterString + ")", Column.DataPropertyName);
-                            appx = " AND ";
-                        }
+                        sb.AppendFormat("(" + cell.FilterString + ") AND ", column.DataPropertyName);
                     }
                 }
             }
+            if (sb.Length > 4)
+                sb.Length -= 4;
+            
             return sb.ToString();
         }
 
         private String CreateSortString()
         {
             StringBuilder sb = new StringBuilder("");
-            String appx = "";
 
-            foreach (String name in this.sortOrder)
+            foreach (string name in this.sortOrder)
             {
-                DataGridViewColumn Column = this.Columns[name];
+                DataGridViewColumn column = this.Columns[name];
 
-                if (Column != null)
+                if (column != null)
                 {
-                    ADGVColumnHeaderCell cell = Column.HeaderCell as ADGVColumnHeaderCell;
-                    if (cell != null)
+                    ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+                    if (cell != null && cell.ActiveSortType != FilterMenuSortType.None)
                     {
-                        if (cell.FilterEnabled && cell.ActiveSortType != ADGVFilterMenuSortType.None)
-                        {
-                            sb.AppendFormat(appx + cell.SortString, Column.DataPropertyName);
-                            appx = ", ";
-                        }
+                        sb.AppendFormat(cell.SortString + ", ", column.DataPropertyName);
                     }
                 }
             }
 
+            if (sb.Length > 2)
+                sb.Length -= 2;
+
             return sb.ToString();
         }
 
-        public void EnableFilter(DataGridViewColumn Column)
+        public void SetFilterBehavior(ADGVColumnHeaderCellBehavior behavior, DataGridViewColumn column = null)
         {
-            if (this.Columns.Contains(Column))
+            if (column == null)
             {
-                ADGVColumnHeaderCell cell = Column.HeaderCell as ADGVColumnHeaderCell;
-                if (cell != null)
+                foreach(DataGridViewColumn c in this.Columns)
                 {
-                    if (!cell.FilterEnabled && (cell.FilterString.Length > 0 || cell.SortString.Length > 0))
-                        this.ClearFilter(true);
+                    ADGVColumnHeaderCell cell = c.HeaderCell as ADGVColumnHeaderCell;
+                    if (cell != null)
+                        cell.CellBehavior = behavior;
 
-                    cell.FilterEnabled = true;
-                    this.readyToShowFilters.Remove(Column.Name);
+                    if (behavior == ADGVColumnHeaderCellBehavior.Default)
+                        c.SortMode = DataGridViewColumnSortMode.Automatic;
+                    else
+                        c.SortMode = DataGridViewColumnSortMode.Programmatic;
+                }
+
+                if (this.SortedColumn != null)
+                {
+                    ADGVColumnHeaderCell cell = this.SortedColumn.HeaderCell as ADGVColumnHeaderCell;
+
+                    if (cell != null)
+                    {
+                        if (behavior == ADGVColumnHeaderCellBehavior.Default)
+                        {
+                            switch (cell.ActiveSortType)
+                            {
+                                case FilterMenuSortType.ASC:
+                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Ascending;
+                                    break;
+                                case FilterMenuSortType.DESC:
+                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Descending;
+                                    break;
+                                default:
+                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
+                                    break;
+                            }
+                        }
+                        else if (behavior == ADGVColumnHeaderCellBehavior.DisabledHidden)
+                        {
+                            this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
+                        }
+                        else
+                        {
+                            switch (this.SortedColumn.HeaderCell.SortGlyphDirection)
+                            {
+                                case System.Windows.Forms.SortOrder.Ascending:
+                                    cell.ClearSorting(FilterMenuSortType.ASC);
+                                    break;
+                                case System.Windows.Forms.SortOrder.Descending:
+                                    cell.ClearSorting(FilterMenuSortType.DESC);
+                                    break;
+                                default:
+                                    cell.ClearSorting(FilterMenuSortType.None);
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+            else if (this.Columns.Contains(column))
+            {
+                ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+                if (cell != null)
+                    cell.CellBehavior = behavior;
+
+                if (behavior == ADGVColumnHeaderCellBehavior.Default)
+                {
+                    column.SortMode = DataGridViewColumnSortMode.Automatic;
+
+                    if (cell != null && cell.ActiveSortType != FilterMenuSortType.None)
+                    {
+                        switch (cell.ActiveSortType)
+                        {
+                            case FilterMenuSortType.ASC:
+                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Ascending;
+                                break;
+                            case FilterMenuSortType.DESC:
+                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Descending;
+                                break;
+                            default :
+                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
+                                break;
+                        }
+                    }
                 }
                 else
                 {
-                    Column.SortMode = DataGridViewColumnSortMode.Programmatic;
-                    cell = new ADGVColumnHeaderCell(Column.HeaderCell, true);
-                    cell.SortChanged += new ADGVFilterEventHandler(eSortChanged);
-                    cell.FilterChanged += new ADGVFilterEventHandler(eFilterChanged);
-                    cell.FilterPopup += new ADGVFilterEventHandler(eFilterPopup);
-                    Column.MinimumWidth = cell.MinimumSize.Width;
-                    if (this.ColumnHeadersHeight < cell.MinimumSize.Height)
-                        this.ColumnHeadersHeight = cell.MinimumSize.Height;
-                    Column.HeaderCell = cell;
+                    column.SortMode = DataGridViewColumnSortMode.Programmatic;
+
+                    if (this.SortedColumn == column && cell != null)
+                    {
+                        if (behavior == ADGVColumnHeaderCellBehavior.DisabledHidden)
+                        {
+                            this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
+                        }
+                        else
+                        {
+                            switch (this.SortedColumn.HeaderCell.SortGlyphDirection)
+                            {
+                                case System.Windows.Forms.SortOrder.Ascending:
+                                    cell.ClearSorting(FilterMenuSortType.ASC);
+                                    break;
+                                case System.Windows.Forms.SortOrder.Descending:
+                                    cell.ClearSorting(FilterMenuSortType.DESC);
+                                    break;
+                                default:
+                                    cell.ClearSorting(FilterMenuSortType.None);
+                                    break;
+                            }
+                        }
+                    }
                 }
-                Column.SortMode = DataGridViewColumnSortMode.Programmatic;
+            }
+        }
+
+        public void SetFilterDateTimeGrouping(FilterDateTimeGrouping grouping, DataGridViewColumn column = null)
+        {
+            if (column == null)
+            {
+                foreach (DataGridViewColumn c in this.Columns)
+                {
+                    ADGVColumnHeaderCell cell = c.HeaderCell as ADGVColumnHeaderCell;
+                    if (cell != null)
+                        cell.DateTimeGrouping = grouping;
+                }
+            }
+            else if (this.Columns.Contains(column))
+            {
+                ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+                if (cell != null)
+                    cell.DateTimeGrouping = grouping;
             }
         }
 
@@ -305,29 +372,7 @@ namespace ADGV
             base.OnSorted(e);
         }
 
-        public void DisableFilter(DataGridViewColumn Column)
-        {
-            if (this.Columns.Contains(Column))
-            {
-                ADGVColumnHeaderCell cell = Column.HeaderCell as ADGVColumnHeaderCell;
-                if (cell != null)
-                {
-                    if (cell.FilterEnabled == true && (cell.SortString.Length > 0 || cell.FilterString.Length > 0))
-                    {
-                        this.ClearFilter(true);
-                        cell.FilterEnabled = false;
-                    }
-                    else
-                        cell.FilterEnabled = false;
-                    this.filterOrder.Remove(Column.Name);
-                    this.sortOrder.Remove(Column.Name);
-                    this.readyToShowFilters.Remove(Column.Name);
-                }
-                Column.SortMode = DataGridViewColumnSortMode.Automatic;
-            }
-        }
-
-        public void LoadFilter(String Filter, String Sorting = null)
+        public void LoadFilter(string filter, string sorting = null)
         {
             foreach (ADGVColumnHeaderCell c in this.filterCells)
                 c.SetLoadedFilterMode(true);
@@ -336,81 +381,107 @@ namespace ADGV
             this.sortOrder.Clear();
             this.readyToShowFilters.Clear();
 
-            if (Filter != null)
-                this.FilterString = Filter;
-            if (Sorting != null)
-                this.SortString = Sorting;
+            if (filter != null)
+                this.FilterString = filter;
+            if (sorting != null)
+                this.SortString = sorting;
 
             this.loadedFilter = true;
         }
 
-        public void ClearSort(Boolean FireEvent = false)
+        public void ClearSort(bool fireEvent = false, DataGridViewColumn column = null)
         {
-            foreach (ADGVColumnHeaderCell c in this.filterCells)
-                c.ClearSorting();
-            this.sortOrder.Clear();
+            if (column == null)
+            {
+                foreach (ADGVColumnHeaderCell c in this.filterCells)
+                    c.ClearSorting();
 
-            if (FireEvent)
+                this.sortOrder.Clear();
+            }
+            else if (this.Columns.Contains(column))
+            {
+                ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+
+                if (cell != null)
+                {
+                    cell.ClearSorting();
+                    this.sortOrder.Remove(column.Name);
+                }
+            }
+
+            if (fireEvent)
                 this.SortString = null;
             else
                 this.sortString = null;
         }
 
-        public void ClearFilter(Boolean FireEvent = false)
+        public void ClearFilter(bool fireEvent = false, DataGridViewColumn column = null)
         {
-            foreach (ADGVColumnHeaderCell c in this.filterCells)
+            if (column == null)
             {
-                c.ClearFilter();
-            }
-            this.filterOrder.Clear();
+                foreach (ADGVColumnHeaderCell c in this.filterCells)
+                    c.ClearFilter();
 
-            if (FireEvent)
+                this.filterOrder.Clear();
+            }
+            else if (this.Columns.Contains(column))
+            {
+                ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
+                
+                if (cell != null)
+                {
+                    cell.ClearFilter();
+                    this.filterOrder.Remove(column.Name);
+                }
+            }
+
+            if (fireEvent)
                 this.FilterString = null;
             else
                 this.filterString = null;
         }
 
-        public DataGridViewCell FindCell(string ValueToFind, string ColumnName = null, int RowIndex = 0, int ColumnIndex = 0, Boolean isWholeWordSearch = true, Boolean isCaseSensitive = false)
+        public DataGridViewCell FindCell(string valueToFind, string columnName = null, int startRowIndex = 0, int startColumnIndex = 0, bool isWholeWordSearch = true, bool isCaseSensitive = false)
         {
-            if (ValueToFind != null && this.RowCount > 0 && this.ColumnCount > 0 && (ColumnName == null || (this.Columns.Contains(ColumnName) && this.Columns[ColumnName].Visible)))
+            if (valueToFind != null && this.RowCount > 0 && this.ColumnCount > 0 && (columnName == null || (this.Columns.Contains(columnName) && this.Columns[columnName].Visible)))
             {
-                RowIndex = Math.Max(0, RowIndex);
+                startRowIndex = Math.Max(0, startRowIndex);
 
                 if (!isCaseSensitive)
-                    ValueToFind = ValueToFind.ToLower();
+                    valueToFind = valueToFind.ToLower();
 
-                if (ColumnName != null)
+                if (columnName != null)
                 {
-                    int c = this.Columns[ColumnName].Index;
-                    if (ColumnIndex > c)
-                        RowIndex++;
-                    for (int r = RowIndex; r < this.RowCount; r++)
+                    int c = this.Columns[columnName].Index;
+                    if (startColumnIndex > c)
+                        startRowIndex++;
+                    for (int r = startRowIndex; r < this.RowCount; r++)
                     {
                         string value = this.Rows[r].Cells[c].FormattedValue.ToString();
                         if (!isCaseSensitive)
                             value = value.ToLower();
 
-                        if ((!isWholeWordSearch && value.Contains(ValueToFind)) || value.Equals(ValueToFind))
+                        if ((!isWholeWordSearch && value.Contains(valueToFind)) || value.Equals(valueToFind))
                             return this.Rows[r].Cells[c];
                     }
                 }
                 else
                 {
-                    ColumnIndex = Math.Max(0, ColumnIndex);
+                    startColumnIndex = Math.Max(0, startColumnIndex);
 
-                    for (int r = RowIndex; r < this.RowCount; r++)
+                    for (int r = startRowIndex; r < this.RowCount; r++)
                     {
-                        for (int c = ColumnIndex; c < this.ColumnCount; c++)
+                        for (int c = startColumnIndex; c < this.ColumnCount; c++)
                         {
                             string value = this.Rows[r].Cells[c].FormattedValue.ToString();
                             if (!isCaseSensitive)
                                 value = value.ToLower();
 
-                            if ((!isWholeWordSearch && value.Contains(ValueToFind)) || value.Equals(ValueToFind))
+                            if ((!isWholeWordSearch && value.Contains(valueToFind)) || value.Equals(valueToFind))
                                 return this.Rows[r].Cells[c];
                         }
 
-                        ColumnIndex = 0;
+                        startColumnIndex = 0;
                     }
                 }
             }

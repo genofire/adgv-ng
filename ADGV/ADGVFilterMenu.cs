@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 namespace ADGV
 {
-    public enum ADGVFilterMenuFilterType : byte
+    public enum FilterMenuFilterType : byte
     {
         None = 0,
         Custom,
@@ -16,7 +16,7 @@ namespace ADGV
         Loaded
     }
 
-    public enum ADGVFilterMenuSortType : byte
+    public enum FilterMenuSortType : byte
     {
         None = 0,
         ASC,
@@ -111,9 +111,9 @@ namespace ADGV
             }
         }
 
-        public ADGVFilterMenuSortType ActiveSortType { get; private set; }
+        public FilterMenuSortType ActiveSortType { get; private set; }
 
-        public ADGVFilterMenuFilterType ActiveFilterType { get; private set; }
+        public FilterMenuFilterType ActiveFilterType { get; private set; }
         
         public string SortString
         {
@@ -123,7 +123,8 @@ namespace ADGV
             }
             private set
             {
-                value = String.IsNullOrWhiteSpace(value) ? null : value;
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
 
                 if (value != this.sortString)
                 {
@@ -142,7 +143,8 @@ namespace ADGV
 
             private set
             {
-                value = String.IsNullOrWhiteSpace(value) ? null : value;
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
 
                 if (value != this.filterString)
                 {
@@ -460,8 +462,8 @@ namespace ADGV
             else
                 this.DataType = FilterDataType.Text;
 
-            this.ActiveFilterType = ADGVFilterMenuFilterType.None;
-            this.ActiveSortType = ADGVFilterMenuSortType.None;
+            this.ActiveFilterType = FilterMenuFilterType.None;
+            this.ActiveSortType = FilterMenuSortType.None;
 
             switch (this.DataType)
             {
@@ -510,7 +512,7 @@ namespace ADGV
             }
 
             this.FiltersMenuItem.Enabled = this.DataType != FilterDataType.Boolean;
-            this.FiltersMenuItem.Checked = this.ActiveFilterType == ADGVFilterMenuFilterType.Custom;
+            this.FiltersMenuItem.Checked = this.ActiveFilterType == FilterMenuFilterType.Custom;
             this.MinimumSize = new Size(this.PreferredSize.Width, this.PreferredSize.Height);
             this.ResizeMenu(this.MinimumSize.Width, this.MinimumSize.Height);
 
@@ -562,14 +564,12 @@ namespace ADGV
             base.Show(control, x, y);
         }
 
-        public void ClearSorting(bool fireEvent = false)
+        public void ClearSorting(FilterMenuSortType sort = FilterMenuSortType.None, bool fireEvent = false)
         {
-            this.SortASCMenuItem.Checked = false;
-            this.SortDESCMenuItem.Checked = false;
-            this.ActiveSortType = ADGVFilterMenuSortType.None;
-            this.SortString = null;
+            string oldSort = this.SortString;
+            this.SetSortingUI(sort);
 
-            if (fireEvent)
+            if (fireEvent && oldSort != this.SortString)
                 this.SortChanged(this, new EventArgs());
         }
 
@@ -579,16 +579,17 @@ namespace ADGV
             {
                 (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
             }
-            this.ActiveFilterType = ADGVFilterMenuFilterType.None;
+            this.ActiveFilterType = FilterMenuFilterType.None;
 
             this.SetNodesCheckedState(this.CheckList.Nodes, true);
 
+            string oldFilter = this.FilterString;
             this.FilterString = null;
             this.filterNodes = null;
             this.FiltersMenuItem.Checked = false;
             this.okButton.Enabled = true;
 
-            if (fireEvent)
+            if (fireEvent && oldFilter != this.FilterString)
                 this.FilterChanged(this, new EventArgs());
         }
 
@@ -599,7 +600,7 @@ namespace ADGV
 
             if (enabled)
             {
-                this.ActiveFilterType = ADGVFilterMenuFilterType.Loaded;
+                this.ActiveFilterType = FilterMenuFilterType.Loaded;
                 this.SortString = null;
                 this.FilterString = null;
                 this.filterNodes = null;
@@ -619,7 +620,7 @@ namespace ADGV
             }
             else
             {
-                this.ActiveFilterType = ADGVFilterMenuFilterType.None;
+                this.ActiveFilterType = FilterMenuFilterType.None;
             }
         }
 
@@ -1088,7 +1089,7 @@ namespace ADGV
 
             this.SetNodesCheckedState(this.CheckList.Nodes, false);
             this.filterNodes = this.CloneCheckListNodes();
-            this.ActiveFilterType = ADGVFilterMenuFilterType.Custom;
+            this.ActiveFilterType = FilterMenuFilterType.Custom;
             this.FiltersMenuItem.Checked = true;
             this.okButton.Enabled = false;
             
@@ -1096,6 +1097,30 @@ namespace ADGV
             {
                 this.FilterString = newFilterString;    
                 this.FilterChanged(this, new EventArgs());
+            }
+        }
+      
+        private void SetSortingUI(FilterMenuSortType sort)
+        {
+            this.ActiveSortType = sort;
+
+            switch (sort)
+            {
+                case FilterMenuSortType.ASC:
+                    this.SortASCMenuItem.Checked = true;
+                    this.SortDESCMenuItem.Checked = false;
+                    this.SortString = "[{0}] ASC";
+                    break;
+                case FilterMenuSortType.DESC:
+                    this.SortASCMenuItem.Checked = false;
+                    this.SortDESCMenuItem.Checked = true;
+                    this.SortString = "[{0}] DESC";
+                    break;
+                default:
+                    this.SortASCMenuItem.Checked = false;
+                    this.SortDESCMenuItem.Checked = false;
+                    this.SortString = null;
+                    break;
             }
         }
 
@@ -1147,23 +1172,18 @@ namespace ADGV
 
         private void SortASCMenuItem_Click(object sender, EventArgs e)
         {
-            this.SortASCMenuItem.Checked = true;
-            this.SortDESCMenuItem.Checked = false;
-            this.ActiveSortType = ADGVFilterMenuSortType.ASC;
-            this.SortString = "[{0}] ASC";
+            this.SetSortingUI(FilterMenuSortType.ASC);
+
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
 
             this.SortChanged(this, new EventArgs());
         }
-
+        
         private void SortDESCMenuItem_Click(object sender, EventArgs e)
         {
-            this.SortASCMenuItem.Checked = false;
-            this.SortDESCMenuItem.Checked = true;
-            this.ActiveSortType = ADGVFilterMenuSortType.DESC;
-            this.SortString = "[{0}] DESC";
-            
+            this.SetSortingUI(FilterMenuSortType.DESC);
+
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
 
@@ -1175,7 +1195,7 @@ namespace ADGV
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
 
-            this.ClearSorting(true);
+            this.ClearSorting(FilterMenuSortType.None, true);
         }
 
         #endregion Sorting Interface events
@@ -1277,7 +1297,7 @@ namespace ADGV
                 CancelFilterMenuItem_Click(null, new EventArgs());
             else
             {
-                this.ActiveFilterType = ADGVFilterMenuFilterType.CheckList;
+                this.ActiveFilterType = FilterMenuFilterType.CheckList;
                 string newfilter = "";
 
                 if (this.CheckList.Nodes.Count > 1)

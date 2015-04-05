@@ -20,18 +20,7 @@ namespace ADGVSample
         {
             InitializeComponent();
             this.dataGridView.AutoGenerateColumns = true;
-
-            foreach(var tg in Enum.GetValues(typeof(FilterDateTimeGrouping)))
-            {
-                this.timeGroupingComboBox.Items.Add(tg);
-            }
-            
-            this.timeGroupingComboBox.SelectedItem = this.dataGridView.DateTimeGrouping;
-            AddData();
-        }
-
-        private void AddData()
-        {
+                        
             dt = this.dataSet.Tables.Add("Table1");
             dt.Columns.Add("boolean", typeof(Boolean));
             dt.Columns.Add("int", typeof(int));
@@ -56,9 +45,23 @@ namespace ADGVSample
             }
             dt.Rows.Add(new object[] { null, null, null, null, null, null, null });
             this.bindingSource.DataMember = dt.TableName;
-        }
-        
 
+            
+
+
+            this.columnComboBox.Items.Add("(All)");
+            foreach (DataColumn c in dt.Columns)
+                this.columnComboBox.Items.Add(c.ColumnName);
+
+            foreach (var bh in Enum.GetValues(typeof(ADGVColumnHeaderCellBehavior)))
+                this.behaviorComboBox.Items.Add(bh);
+            foreach (var tg in Enum.GetValues(typeof(FilterDateTimeGrouping)))
+                this.timeGroupingComboBox.Items.Add(tg);
+
+            this.columnComboBox.SelectedIndex = 0;
+        }
+
+        
         private void dataGridView_SortStringChanged(object sender, EventArgs e)
         {
             this.bindingSource.Sort = this.dataGridView.SortString;
@@ -91,12 +94,6 @@ namespace ADGVSample
                 this.searchToolBar.Show();
             else
                 this.searchToolBar.Hide();
-        }
-
-        private void hideColumnButton_Click(object sender, EventArgs e)
-        {
-            this.dataGridView.Columns["boolean"].Visible = hideColumnButton.Checked;
-            this.searchToolBar.SetColumns(this.dataGridView.Columns);
         }
 
         private void searchToolBar_VisibleChanged(object sender, EventArgs e)
@@ -136,26 +133,6 @@ namespace ADGVSample
                 this.dataGridView.CurrentCell = c;
         }
 
-        private void toolStripButton2_Click(object sender, EventArgs e)
-        {
-      //      this.dataGridView.DateWithTime = !this.dataGridView.DateWithTime;
-            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"]);
-        }
-
-        private void toolStripButton1_Click(object sender, EventArgs e)
-        {
-//            this.dataGridView.TimeFilter = !this.dataGridView.TimeFilter;
-            this.dataGridView.EnableFilter(this.dataGridView.Columns["date"]);
-        }
-
-        private void toolStripButton3_Click(object sender, EventArgs e)
-        {
-            if (!toolStripButton3.Checked)
-                this.dataGridView.DisableFilter(this.dataGridView.Columns["int"]);
-            else 
-                this.dataGridView.EnableFilter(this.dataGridView.Columns["int"]);
-        }
-
         private void toolStripMenuItem1_Click(object sender, EventArgs e)
         {
             int i = filters.Count + 1;
@@ -175,7 +152,24 @@ namespace ADGVSample
 
         private void timeGroupingComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            this.dataGridView.DateTimeGrouping = (FilterDateTimeGrouping)this.timeGroupingComboBox.SelectedItem;
+            var c = this.dataGridView.Columns[this.columnComboBox.SelectedItem.ToString()];
+            this.dataGridView.SetFilterDateTimeGrouping((FilterDateTimeGrouping)this.timeGroupingComboBox.SelectedItem, c);
+        }
+
+        private void behaviorComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var c = this.dataGridView.Columns[this.columnComboBox.SelectedItem.ToString()];
+            this.dataGridView.SetFilterBehavior((ADGVColumnHeaderCellBehavior)this.behaviorComboBox.SelectedItem, c);
+        }
+
+        private void columnComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var c = this.dataGridView.Columns[this.columnComboBox.SelectedItem.ToString()];
+            if (c != null)
+            {
+                this.behaviorComboBox.SelectedItem = (c.HeaderCell as ADGVColumnHeaderCell).CellBehavior;
+                this.timeGroupingComboBox.SelectedItem = (c.HeaderCell as ADGVColumnHeaderCell).DateTimeGrouping;
+            }
         }
     }
 }
