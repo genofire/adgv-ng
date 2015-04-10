@@ -107,6 +107,8 @@ namespace ADGV
                         if (this.CheckList.Nodes.Count > 0)
                             this.LoadNodes(this.RecreateDateTimeNodes(this.CheckList.Nodes.Cast<TripleTreeNode>()));
                     }
+
+                    this.DateTimeGroupingChanged(this, new EventArgs());
                 }
             }
         }
@@ -158,8 +160,9 @@ namespace ADGV
 
         public event EventHandler FilterChanged = delegate { };
 
-        public ADGVFilterMenu(Type dataType)
-            : base()
+        public event EventHandler DateTimeGroupingChanged = delegate { };
+
+        private void InitializeComponent()
         {
             this.RM = new System.Resources.ResourceManager("ADGV.Localization.ADGVStrings", typeof(ADGV.ADGVFilterMenu).Assembly);
 
@@ -448,20 +451,6 @@ namespace ADGV
                     this.CheckList.StateImageList.Images.Add("mixed", (Bitmap)img.Clone());
                 }
             }
-
-            if (dataType == typeof(Boolean))
-                this.DataType = FilterDataType.Boolean;
-            else if (dataType == typeof(DateTime))
-                this.DataType = FilterDataType.DateTime;
-            else if (dataType == typeof(Int32) || dataType == typeof(Int64) || dataType == typeof(Int16) ||
-                    dataType == typeof(UInt32) || dataType == typeof(UInt64) || dataType == typeof(UInt16) ||
-                    dataType == typeof(Byte) || dataType == typeof(SByte))
-                this.DataType = FilterDataType.Int;
-            else if (dataType == typeof(Single) || dataType == typeof(Double) || dataType == typeof(Decimal))
-                this.DataType = FilterDataType.Float;
-            else
-                this.DataType = FilterDataType.Text;
-
             this.ActiveFilterType = FilterMenuFilterType.None;
             this.ActiveSortType = FilterMenuSortType.None;
 
@@ -519,6 +508,32 @@ namespace ADGV
             this.ResumeLayout(false);
         }
 
+        public ADGVFilterMenu(Type dataType)
+            : base()
+        {
+            if (dataType == typeof(Boolean))
+                this.DataType = FilterDataType.Boolean;
+            else if (dataType == typeof(DateTime))
+                this.DataType = FilterDataType.DateTime;
+            else if (dataType == typeof(Int32) || dataType == typeof(Int64) || dataType == typeof(Int16) ||
+                    dataType == typeof(UInt32) || dataType == typeof(UInt64) || dataType == typeof(UInt16) ||
+                    dataType == typeof(Byte) || dataType == typeof(SByte))
+                this.DataType = FilterDataType.Int;
+            else if (dataType == typeof(Single) || dataType == typeof(Double) || dataType == typeof(Decimal))
+                this.DataType = FilterDataType.Float;
+            else
+                this.DataType = FilterDataType.Text;
+
+            this.InitializeComponent();
+        }
+
+        public ADGVFilterMenu(FilterDataType filterDataType)
+            : base()
+        {
+            this.DataType = filterDataType;
+            this.InitializeComponent();
+        }
+
         protected override void Dispose(bool disposing)
         {
             this.RM = null;
@@ -526,11 +541,58 @@ namespace ADGV
             this.allsNode = null;
             this.startingNodes = null;
             this.filterNodes = null;
+            this.ClearResizeBox();
 
             base.Dispose(disposing);
         }
 
         #region Public Methods
+
+        public object Clone()
+        {
+            ADGVFilterMenu m = new ADGVFilterMenu(this.DataType);
+
+            m.ActiveFilterType = this.ActiveFilterType;
+            m.ActiveSortType = this.ActiveSortType;
+            m.SortString = this.SortString;
+            m.FilterString = this.FilterString;
+            m.checkListChanged = this.checkListChanged;
+            m.resizeEndPoint = this.resizeEndPoint;
+            m.dateTimeGrouping = this.dateTimeGrouping;
+            m.LoadNodes(this.CloneNodes(this.CheckList.Nodes));
+            m.startingNodes = this.CloneNodes(this.startingNodes);
+            m.filterNodes = this.CloneNodes(this.filterNodes);
+            m.ResizeMenu(this.Width, this.Height);
+            
+            m.SortASCMenuItem.Checked = this.SortASCMenuItem.Checked;
+            m.SortDESCMenuItem.Checked = this.SortDESCMenuItem.Checked;
+            m.FiltersMenuItem.Enabled = this.FiltersMenuItem.Enabled ;
+            m.FiltersMenuItem.Checked = this.FiltersMenuItem.Checked;
+            m.okButton.Enabled = this.okButton.Enabled;
+            m.cancelButton.Enabled = this.cancelButton.Enabled;
+
+            if (!this.toolStripSeparator2MenuItem.Visible)
+            {
+                m.toolStripSeparator2MenuItem.Visible = false;
+                m.lastfilter1MenuItem.VisibleChanged -= m.lastfilterMenuItem_VisibleChanged;
+            }
+
+            for (int i = 2; i < m.FiltersMenuItem.DropDownItems.Count; i++)
+            {
+                m.FiltersMenuItem.DropDownItems[i].Text = this.FiltersMenuItem.DropDownItems[i].Text;
+                m.FiltersMenuItem.DropDownItems[i].Tag = this.FiltersMenuItem.DropDownItems[i].Tag;
+                m.FiltersMenuItem.DropDownItems[i].Visible = this.FiltersMenuItem.DropDownItems[i].Visible;
+                (m.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked;
+
+                if (!this.FiltersMenuItem.DropDownItems[i].Available)
+                {
+                    m.FiltersMenuItem.DropDownItems[i].Available = false;
+                    m.FiltersMenuItem.DropDownItems[i].TextChanged -= m.lastfilterMenuItem_TextChanged;
+                }
+            }
+
+            return m;
+        }
 
         public static IEnumerable<object> GetValuesForFilter(DataGridView grid, String columnName, bool useFormatedValue = false)
         {
@@ -560,7 +622,7 @@ namespace ADGV
             if (restoreFilter)
                 this.LoadNodes(this.filterNodes);
 
-            this.startingNodes = this.CloneCheckListNodes();
+            this.startingNodes = this.CloneNodes(this.CheckList.Nodes);
             base.Show(control, x, y);
         }
 
@@ -904,12 +966,26 @@ namespace ADGV
                 return null;
         }
 
-        private IEnumerable<TripleTreeNode> CloneCheckListNodes()
+        private IEnumerable<TripleTreeNode> CloneNodes(IEnumerable<TripleTreeNode> nodes)
         {
-            if (this.CheckList.Nodes.Count > 0)
+            if (nodes != null && nodes.Count() > 0)
             {
-                var result = new TripleTreeNode[this.CheckList.Nodes.Count];
-                foreach (TripleTreeNode n in this.CheckList.Nodes)
+                var result = new TripleTreeNode[nodes.Count()];
+                foreach (TripleTreeNode n in nodes)
+                    result[n.Index] = n.Clone();
+
+                return result;
+            }
+            else
+                return null;
+        }
+
+        private IEnumerable<TripleTreeNode> CloneNodes(TreeNodeCollection nodes)
+        {
+            if (nodes != null && nodes.Count > 0)
+            {
+                var result = new TripleTreeNode[nodes.Count];
+                foreach (TripleTreeNode n in nodes)
                     result[n.Index] = n.Clone();
 
                 return result;
@@ -1088,7 +1164,7 @@ namespace ADGV
             (this.FiltersMenuItem.DropDownItems[2] as ToolStripMenuItem).Checked = true;
 
             this.SetNodesCheckedState(this.CheckList.Nodes, false);
-            this.filterNodes = this.CloneCheckListNodes();
+            this.filterNodes = this.CloneNodes(this.CheckList.Nodes);
             this.ActiveFilterType = FilterMenuFilterType.Custom;
             this.FiltersMenuItem.Checked = true;
             this.okButton.Enabled = false;
@@ -1245,8 +1321,8 @@ namespace ADGV
 
         private void lastfilterMenuItem_VisibleChanged(object sender, EventArgs e)
         {
-            toolStripSeparator2MenuItem.Visible = false;
-            lastfilter1MenuItem.VisibleChanged -= lastfilterMenuItem_VisibleChanged;
+            this.toolStripSeparator2MenuItem.Visible = false;
+            this.lastfilter1MenuItem.VisibleChanged -= lastfilterMenuItem_VisibleChanged;
         }
 
         private void lastfilterMenuItem_Click(object sender, EventArgs e)
@@ -1332,7 +1408,7 @@ namespace ADGV
 
                 if (newfilter != this.FilterString)
                 {
-                    this.filterNodes = this.CloneCheckListNodes();
+                    this.filterNodes = this.CloneNodes(this.CheckList.Nodes);
                     this.FilterString = newfilter;
 
                     this.FilterChanged(this, new EventArgs());
@@ -1368,7 +1444,7 @@ namespace ADGV
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
-                ClearResizeBox();
+                this.ClearResizeBox();
             }
         }
 
@@ -1377,7 +1453,7 @@ namespace ADGV
             if (this.Visible)
             {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left)
-                    PaintResizeBox(e.X, e.Y);
+                    this.PaintResizeBox(e.X, e.Y);
             }
         }
 
@@ -1395,7 +1471,7 @@ namespace ADGV
                         newWidth = Math.Max(newWidth, this.MinimumSize.Width);
                         newHeight = Math.Max(newHeight, this.MinimumSize.Height);
 
-                        ResizeMenu(newWidth, newHeight);
+                        this.ResizeMenu(newWidth, newHeight);
                     }
             }
         }

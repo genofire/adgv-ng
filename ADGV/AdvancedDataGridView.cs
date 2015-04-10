@@ -241,54 +241,6 @@ namespace ADGV
                     ADGVColumnHeaderCell cell = c.HeaderCell as ADGVColumnHeaderCell;
                     if (cell != null)
                         cell.CellBehavior = behavior;
-
-                    if (behavior == ADGVColumnHeaderCellBehavior.Default)
-                        c.SortMode = DataGridViewColumnSortMode.Automatic;
-                    else
-                        c.SortMode = DataGridViewColumnSortMode.Programmatic;
-                }
-
-                if (this.SortedColumn != null)
-                {
-                    ADGVColumnHeaderCell cell = this.SortedColumn.HeaderCell as ADGVColumnHeaderCell;
-
-                    if (cell != null)
-                    {
-                        if (behavior == ADGVColumnHeaderCellBehavior.Default)
-                        {
-                            switch (cell.ActiveSortType)
-                            {
-                                case FilterMenuSortType.ASC:
-                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Ascending;
-                                    break;
-                                case FilterMenuSortType.DESC:
-                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Descending;
-                                    break;
-                                default:
-                                    this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
-                                    break;
-                            }
-                        }
-                        else if (behavior == ADGVColumnHeaderCellBehavior.DisabledHidden)
-                        {
-                            this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
-                        }
-                        else
-                        {
-                            switch (this.SortedColumn.HeaderCell.SortGlyphDirection)
-                            {
-                                case System.Windows.Forms.SortOrder.Ascending:
-                                    cell.ClearSorting(FilterMenuSortType.ASC);
-                                    break;
-                                case System.Windows.Forms.SortOrder.Descending:
-                                    cell.ClearSorting(FilterMenuSortType.DESC);
-                                    break;
-                                default:
-                                    cell.ClearSorting(FilterMenuSortType.None);
-                                    break;
-                            }
-                        }
-                    }
                 }
             }
             else if (this.Columns.Contains(column))
@@ -296,54 +248,6 @@ namespace ADGV
                 ADGVColumnHeaderCell cell = column.HeaderCell as ADGVColumnHeaderCell;
                 if (cell != null)
                     cell.CellBehavior = behavior;
-
-                if (behavior == ADGVColumnHeaderCellBehavior.Default)
-                {
-                    column.SortMode = DataGridViewColumnSortMode.Automatic;
-
-                    if (cell != null && cell.ActiveSortType != FilterMenuSortType.None)
-                    {
-                        switch (cell.ActiveSortType)
-                        {
-                            case FilterMenuSortType.ASC:
-                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Ascending;
-                                break;
-                            case FilterMenuSortType.DESC:
-                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.Descending;
-                                break;
-                            default :
-                                this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
-                                break;
-                        }
-                    }
-                }
-                else
-                {
-                    column.SortMode = DataGridViewColumnSortMode.Programmatic;
-
-                    if (this.SortedColumn == column && cell != null)
-                    {
-                        if (behavior == ADGVColumnHeaderCellBehavior.DisabledHidden)
-                        {
-                            this.SortedColumn.HeaderCell.SortGlyphDirection = System.Windows.Forms.SortOrder.None;
-                        }
-                        else
-                        {
-                            switch (this.SortedColumn.HeaderCell.SortGlyphDirection)
-                            {
-                                case System.Windows.Forms.SortOrder.Ascending:
-                                    cell.ClearSorting(FilterMenuSortType.ASC);
-                                    break;
-                                case System.Windows.Forms.SortOrder.Descending:
-                                    cell.ClearSorting(FilterMenuSortType.DESC);
-                                    break;
-                                default:
-                                    cell.ClearSorting(FilterMenuSortType.None);
-                                    break;
-                            }
-                        }
-                    }
-                }
             }
         }
 

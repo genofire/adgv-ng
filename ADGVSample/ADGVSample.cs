@@ -38,7 +38,7 @@ namespace ADGVSample
                     (decimal)i*2/3,
                     i % 2 == 0 ? (double)i*2/3 : (double)i/2, 
                     DateTime.Today.AddHours(i*2).AddHours(i%2 == 0 ?i*10+1:0).AddMinutes(i%2 == 0 ?i*10+1:0).AddSeconds(i%2 == 0 ?i*10+1:0).AddMilliseconds(i%2 == 0 ?i*10+1:0),
-                    i*2 % 3 == 0 ? null : i.ToString()+" str", 
+                    i*2 % 3 == 0 ? null : (i.ToString()+" str" + (i == 2 ? " }" : "") + (i == 4 ? " {" : "") + (i == 5 ? " {0}" : "")), 
                     
                     Guid.NewGuid() 
                 });
