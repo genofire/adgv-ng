@@ -683,8 +683,13 @@ namespace ADGV
 
                 this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text = filterDisplayName;
 
-                this.SetCustomFilter(filtersMenuItemIndex, fireEvent);
+                this.SelectCustomFilter(filtersMenuItemIndex, fireEvent);
             }
+        }
+
+        public void SaveCurrentFilter()
+        {
+            this.SetCustomFilter(this.filterString);
         }
 
         #endregion Public Methods
@@ -1140,7 +1145,7 @@ namespace ADGV
             return sb.ToString();
         }
 
-        private void SetCustomFilter(int filtersMenuItemIndex, bool fireEvent = true)
+        private void SelectCustomFilter(int filtersMenuItemIndex, bool fireEvent = true)
         {
             String newFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Tag.ToString();
             String newViewFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text;
@@ -1316,7 +1321,7 @@ namespace ADGV
                     this.FiltersMenuItem.DropDownItems[2].Tag = flt.FilterString;
                 }
 
-                this.SetCustomFilter(index);
+                this.SelectCustomFilter(index);
             }
         }
 
@@ -1334,7 +1339,7 @@ namespace ADGV
             {
                 if (FiltersMenuItem.DropDownItems[i].Text == menuitem.Text && FiltersMenuItem.DropDownItems[i].Tag.ToString() == menuitem.Tag.ToString())
                 {
-                    this.SetCustomFilter(i);
+                    this.SelectCustomFilter(i);
                     break;
                 }
             }

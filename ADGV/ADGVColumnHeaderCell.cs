@@ -196,6 +196,11 @@ namespace ADGV
             this.RepaintCell();
         }
 
+        public void SaveCurrentFilter()
+        {
+            this.FilterMenu.SaveCurrentFilter();
+        }
+        
         private void FilterMenu_FilterChanged(object sender, EventArgs e)
         {
             this.RepaintCell();
