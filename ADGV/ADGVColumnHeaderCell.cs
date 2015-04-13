@@ -23,7 +23,7 @@ namespace ADGV
         private Padding filterButtonMargin = new Padding(3, 4, 3, 4);
         private ADGVColumnHeaderCellBehavior cellBehavior;
 
-        public FilterDateTimeGrouping DateTimeGrouping
+        public ADGVFilterMenuDateTimeGrouping DateTimeGrouping
         {
             get
             {
@@ -59,7 +59,7 @@ namespace ADGV
             }
         }
 
-        public FilterMenuSortType ActiveSortType
+        public ADGVSortType ActiveSortType
         {
             get
             {
@@ -67,7 +67,7 @@ namespace ADGV
             }
         }
 
-        public FilterMenuFilterType ActiveFilterType
+        public ADGVFilterType ActiveFilterType
         {
             get
             {
@@ -131,12 +131,16 @@ namespace ADGV
             this.ValueType = oldCell.ValueType;
             this.ContextMenuStrip = oldCell.ContextMenuStrip;
             this.Style = oldCell.Style;
-                        
+            this.cellBehavior = cellBehavior;
+            
             ADGVColumnHeaderCell oldADGVCell = oldCell as ADGVColumnHeaderCell;
                         
-            if (oldADGVCell != null && oldADGVCell.FilterMenu != null)
+            if (oldADGVCell != null)
             {
-                this.FilterMenu = oldADGVCell.FilterMenu.Clone() as ADGVFilterMenu;
+                if (oldADGVCell.FilterMenu != null)
+                    this.FilterMenu = oldADGVCell.FilterMenu.Clone() as ADGVFilterMenu;
+                else
+                    this.FilterMenu = new ADGVFilterMenu(oldCell.OwningColumn.ValueType);
 
                 this.filterButtonPressed = oldADGVCell.filterButtonPressed;
                 this.filterButtonOver = oldADGVCell.filterButtonOver;
@@ -147,12 +151,15 @@ namespace ADGV
             {
                 this.FilterMenu = new ADGVFilterMenu(oldCell.OwningColumn.ValueType);
             }
-
-            this.CellBehavior = cellBehavior;
-
+                        
             this.FilterMenu.FilterChanged += FilterMenu_FilterChanged;
             this.FilterMenu.SortChanged += FilterMenu_SortChanged;
             this.FilterMenu.DateTimeGroupingChanged += FilterMenu_DateTimeGroupingChanged;
+        }
+
+        public void SetCustomFilter(string filter, string filterName = null, bool fireEvent = false)
+        {
+            this.FilterMenu.SetCustomFilter(filter, filterName, fireEvent);
         }
 
         void FilterMenu_DateTimeGroupingChanged(object sender, EventArgs e)
@@ -171,9 +178,15 @@ namespace ADGV
                 this.DataGridView.InvalidateCell(this);
         }
 
-        public void ClearSorting(FilterMenuSortType sort = FilterMenuSortType.None, bool fireEvent = false)
+        public void ClearSorting(bool fireEvent = false)
         {
-             this.FilterMenu.ClearSorting(FilterMenuSortType.None, fireEvent);
+            this.FilterMenu.ClearSorting(fireEvent);
+            this.RepaintCell();
+        }
+
+        public void SetSorting(ADGVSortType sort, bool fireEvent = false)
+        {
+            this.FilterMenu.SetSorting(sort, fireEvent);
             this.RepaintCell();
         }
 
@@ -207,13 +220,13 @@ namespace ADGV
             {
                 switch (this.ActiveSortType)
                 {
-                    case FilterMenuSortType.ASC:
+                    case ADGVSortType.ASC:
                         this.SortGlyphDirection = SortOrder.Ascending;
                         break;
-                    case FilterMenuSortType.DESC:
+                    case ADGVSortType.DESC:
                         this.SortGlyphDirection = SortOrder.Descending;
                         break;
-                    case FilterMenuSortType.None:
+                    case ADGVSortType.None:
                         this.SortGlyphDirection = SortOrder.None;
                         break;
                 }
@@ -229,29 +242,29 @@ namespace ADGV
             {
                 Image filterImage = Properties.Resources.AddFilter;
 
-                if (this.cellBehavior == ADGVColumnHeaderCellBehavior.Sorting || this.ActiveFilterType == FilterMenuFilterType.None)
+                if (this.cellBehavior == ADGVColumnHeaderCellBehavior.Sorting || this.ActiveFilterType == ADGVFilterType.None)
                     switch (this.ActiveSortType)
                     {
-                        case FilterMenuSortType.ASC:
+                        case ADGVSortType.ASC:
                             filterImage = Properties.Resources.ASC;
                             break;
-                        case FilterMenuSortType.DESC:
+                        case ADGVSortType.DESC:
                             filterImage = Properties.Resources.DESC;
                             break;
-                        case FilterMenuSortType.None:
+                        case ADGVSortType.None:
                             filterImage = Properties.Resources.AddFilter;
                             break;
                     }
                 else
                     switch (this.ActiveSortType)
                     {
-                        case FilterMenuSortType.ASC:
+                        case ADGVSortType.ASC:
                             filterImage = Properties.Resources.FilterASC;
                             break;
-                        case FilterMenuSortType.DESC:
+                        case ADGVSortType.DESC:
                             filterImage = Properties.Resources.FilterDESC;
                             break;
-                        case FilterMenuSortType.None:
+                        case ADGVSortType.None:
                             filterImage = Properties.Resources.Filter;
                             break;
                     }
@@ -332,14 +345,14 @@ namespace ADGV
                 if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingStandartGlyph)
                     switch (this.ActiveSortType)
                     {
-                        case FilterMenuSortType.ASC:
-                            this.FilterMenu.ClearSorting(FilterMenuSortType.DESC, true);
+                        case ADGVSortType.ASC:
+                            this.FilterMenu.SetSorting(ADGVSortType.DESC, true);
                             break;
-                        case FilterMenuSortType.DESC:
-                            this.FilterMenu.ClearSorting(FilterMenuSortType.None, true);
+                        case ADGVSortType.DESC:
+                            this.FilterMenu.SetSorting(ADGVSortType.None, true);
                             break;
-                        case FilterMenuSortType.None:
-                            this.FilterMenu.ClearSorting(FilterMenuSortType.ASC, true);
+                        case ADGVSortType.None:
+                            this.FilterMenu.SetSorting(ADGVSortType.ASC, true);
                             break;
                     }
                 else if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering || this.CellBehavior == ADGVColumnHeaderCellBehavior.Sorting)
@@ -353,14 +366,14 @@ namespace ADGV
                         else
                             switch (this.ActiveSortType)
                             {
-                                case FilterMenuSortType.ASC:
-                                    this.FilterMenu.ClearSorting(FilterMenuSortType.DESC, true);
+                                case ADGVSortType.ASC:
+                                    this.FilterMenu.SetSorting(ADGVSortType.DESC, true);
                                     break;
-                                case FilterMenuSortType.DESC:
-                                    this.FilterMenu.ClearSorting(FilterMenuSortType.None, true);
+                                case ADGVSortType.DESC:
+                                    this.FilterMenu.SetSorting(ADGVSortType.None, true);
                                     break;
-                                case FilterMenuSortType.None:
-                                    this.FilterMenu.ClearSorting(FilterMenuSortType.ASC, true);
+                                case ADGVSortType.None:
+                                    this.FilterMenu.SetSorting(ADGVSortType.ASC, true);
                                     break;
                             }
                     }
@@ -381,12 +394,6 @@ namespace ADGV
 
             base.OnMouseLeave(rowIndex);
         }
-
-        public void SetLoadedFilterMode(Boolean Enabled)
-        {
-            this.FilterMenu.SetLoadedFilterMode(Enabled);
-            this.RepaintCell();
-        }
     }
 
     public delegate void ADGVFilterEventHandler(object sender, ADGVFilterEventArgs e);
@@ -396,6 +403,14 @@ namespace ADGV
         public ADGVFilterMenu FilterMenu { get; private set; }
 
         public DataGridViewColumn Column { get; private set; }
+
+        public ADGVColumnHeaderCell HeaderCell
+        {
+            get
+            {
+                return this.Column.HeaderCell as ADGVColumnHeaderCell;
+            }
+        }
 
         public ADGVFilterEventArgs(ADGVFilterMenu filterMenu, DataGridViewColumn column)
         {

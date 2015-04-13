@@ -8,22 +8,21 @@ using System.Windows.Forms;
 
 namespace ADGV
 {
-    public enum FilterMenuFilterType : byte
+    public enum ADGVFilterType : byte
     {
         None = 0,
         Custom,
-        CheckList,
-        Loaded
+        CheckList
     }
 
-    public enum FilterMenuSortType : byte
+    public enum ADGVSortType : byte
     {
         None = 0,
         ASC,
         DESC
     }
-    
-    public enum FilterDateTimeGrouping : byte
+
+    public enum ADGVFilterMenuDateTimeGrouping : byte
     {
         None = 0,
         Year,
@@ -34,7 +33,7 @@ namespace ADGV
         Second
     }
 
-    public enum FilterDataType : byte
+    public enum ADGVFilterMenuDataType : byte
     {
         Text = 0,
         Int,
@@ -83,11 +82,11 @@ namespace ADGV
         private bool checkListChanged = false;
         
         private Point resizeEndPoint = new Point(-1, -1);
-        private FilterDateTimeGrouping dateTimeGrouping = FilterDateTimeGrouping.Second;
+        private ADGVFilterMenuDateTimeGrouping dateTimeGrouping = ADGVFilterMenuDateTimeGrouping.Second;
 
-        public FilterDataType DataType { get; private set; }
+        public ADGVFilterMenuDataType DataType { get; private set; }
 
-        public FilterDateTimeGrouping DateTimeGrouping 
+        public ADGVFilterMenuDateTimeGrouping DateTimeGrouping 
         {
             get
             {
@@ -99,7 +98,7 @@ namespace ADGV
                 {
                     this.dateTimeGrouping = value;
 
-                    if (this.DataType == FilterDataType.DateTime)
+                    if (this.DataType == ADGVFilterMenuDataType.DateTime)
                     {
                         if (this.filterNodes != null)
                             this.filterNodes = this.RecreateDateTimeNodes(this.filterNodes);
@@ -113,9 +112,9 @@ namespace ADGV
             }
         }
 
-        public FilterMenuSortType ActiveSortType { get; private set; }
+        public ADGVSortType ActiveSortType { get; private set; }
 
-        public FilterMenuFilterType ActiveFilterType { get; private set; }
+        public ADGVFilterType ActiveFilterType { get; private set; }
         
         public string SortString
         {
@@ -451,12 +450,12 @@ namespace ADGV
                     this.CheckList.StateImageList.Images.Add("mixed", (Bitmap)img.Clone());
                 }
             }
-            this.ActiveFilterType = FilterMenuFilterType.None;
-            this.ActiveSortType = FilterMenuSortType.None;
+            this.ActiveFilterType = ADGVFilterType.None;
+            this.ActiveSortType = ADGVSortType.None;
 
             switch (this.DataType)
             {
-                case FilterDataType.DateTime:
+                case ADGVFilterMenuDataType.DateTime:
                     this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_datetime");
                     this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_datetime");
                     this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_datetime");
@@ -476,15 +475,15 @@ namespace ADGV
                     this.months[11] = this.RM.GetString("month11");
                     this.months[12] = this.RM.GetString("month12");
                     break;
-                case FilterDataType.Boolean:
+                case ADGVFilterMenuDataType.Boolean:
                     this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_text");
                     this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_boolean");
                     this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_boolean");
                     this.SortASCMenuItem.Image = Properties.Resources.ASCbool;
                     this.SortDESCMenuItem.Image = Properties.Resources.DESCbool;
                     break;
-                case FilterDataType.Int:
-                case FilterDataType.Float:
+                case ADGVFilterMenuDataType.Int:
+                case ADGVFilterMenuDataType.Float:
                     this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_numeric");
                     this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_numeric");
                     this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_numeric");
@@ -500,8 +499,8 @@ namespace ADGV
                     break;
             }
 
-            this.FiltersMenuItem.Enabled = this.DataType != FilterDataType.Boolean;
-            this.FiltersMenuItem.Checked = this.ActiveFilterType == FilterMenuFilterType.Custom;
+            this.FiltersMenuItem.Enabled = this.DataType != ADGVFilterMenuDataType.Boolean;
+            this.FiltersMenuItem.Checked = this.ActiveFilterType == ADGVFilterType.Custom;
             this.MinimumSize = new Size(this.PreferredSize.Width, this.PreferredSize.Height);
             this.ResizeMenu(this.MinimumSize.Width, this.MinimumSize.Height);
 
@@ -512,22 +511,22 @@ namespace ADGV
             : base()
         {
             if (dataType == typeof(Boolean))
-                this.DataType = FilterDataType.Boolean;
+                this.DataType = ADGVFilterMenuDataType.Boolean;
             else if (dataType == typeof(DateTime))
-                this.DataType = FilterDataType.DateTime;
+                this.DataType = ADGVFilterMenuDataType.DateTime;
             else if (dataType == typeof(Int32) || dataType == typeof(Int64) || dataType == typeof(Int16) ||
                     dataType == typeof(UInt32) || dataType == typeof(UInt64) || dataType == typeof(UInt16) ||
                     dataType == typeof(Byte) || dataType == typeof(SByte))
-                this.DataType = FilterDataType.Int;
+                this.DataType = ADGVFilterMenuDataType.Int;
             else if (dataType == typeof(Single) || dataType == typeof(Double) || dataType == typeof(Decimal))
-                this.DataType = FilterDataType.Float;
+                this.DataType = ADGVFilterMenuDataType.Float;
             else
-                this.DataType = FilterDataType.Text;
+                this.DataType = ADGVFilterMenuDataType.Text;
 
             this.InitializeComponent();
         }
 
-        public ADGVFilterMenu(FilterDataType filterDataType)
+        public ADGVFilterMenu(ADGVFilterMenuDataType filterDataType)
             : base()
         {
             this.DataType = filterDataType;
@@ -626,7 +625,12 @@ namespace ADGV
             base.Show(control, x, y);
         }
 
-        public void ClearSorting(FilterMenuSortType sort = FilterMenuSortType.None, bool fireEvent = false)
+        public void ClearSorting(bool fireEvent = false)
+        {
+            this.SetSorting(ADGVSortType.None, fireEvent);
+        }
+
+        public void SetSorting(ADGVSortType sort, bool fireEvent = false)
         {
             string oldSort = this.SortString;
             this.SetSortingUI(sort);
@@ -641,7 +645,7 @@ namespace ADGV
             {
                 (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
             }
-            this.ActiveFilterType = FilterMenuFilterType.None;
+            this.ActiveFilterType = ADGVFilterType.None;
 
             this.SetNodesCheckedState(this.CheckList.Nodes, true);
 
@@ -655,34 +659,31 @@ namespace ADGV
                 this.FilterChanged(this, new EventArgs());
         }
 
-        public void SetLoadedFilterMode(bool enabled)
+        public void SetCustomFilter(string filter, string filterDisplayName = null, bool fireEvent = false)
         {
-            this.FiltersMenuItem.Enabled = !enabled;
-            this.CancelFilterMenuItem.Enabled = enabled;
-
-            if (enabled)
+            if (!String.IsNullOrWhiteSpace(filter))
             {
-                this.ActiveFilterType = FilterMenuFilterType.Loaded;
-                this.SortString = null;
-                this.FilterString = null;
-                this.filterNodes = null;
-                this.startingNodes = null;
-                this.FiltersMenuItem.Checked = false;
+                if (String.IsNullOrWhiteSpace(filterDisplayName))
+                    filterDisplayName = filter.Length > 30 ? filter.Remove(29) + "..." : filter;
 
-                for (int i = 2; i < FiltersMenuItem.DropDownItems.Count - 1; i++)
+                int filtersMenuItemIndex = -1;
+
+                for (int i = 2; i < this.FiltersMenuItem.DropDownItems.Count - 1; i++)
+                    if (filter == this.FiltersMenuItem.DropDownItems[2].Tag.ToString())
+                    {
+                        filtersMenuItemIndex = i;
+                        break;
+                    }
+
+                if (filtersMenuItemIndex == -1)
                 {
-                    (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
+                    filtersMenuItemIndex = 2;
+                    this.FiltersMenuItem.DropDownItems[2].Tag = filter;
                 }
 
-                var allsNode = TripleTreeNode.CreateAllsNode(this.RM.GetString("tripletreenode_allnode_text") + "            ");
-                allsNode.NodeFont = new Font(this.CheckList.Font, FontStyle.Bold);
-                allsNode.CheckState = CheckState.Indeterminate;
+                this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text = filterDisplayName;
 
-                this.LoadNodes(new TripleTreeNode[] { allsNode });
-            }
-            else
-            {
-                this.ActiveFilterType = FilterMenuFilterType.None;
+                this.SetCustomFilter(filtersMenuItemIndex, fireEvent);
             }
         }
 
@@ -718,19 +719,19 @@ namespace ADGV
             this.CheckList.EndUpdate();
         }
 
-        private string DateTimeToNodeText(DateTime date, FilterDateTimeGrouping grouping, bool showTime)
+        private string DateTimeToNodeText(DateTime date, ADGVFilterMenuDateTimeGrouping grouping, bool showTime)
         {
             if (showTime)
             {
                 switch (grouping)
                 {
-                    case FilterDateTimeGrouping.Month:
+                    case ADGVFilterMenuDateTimeGrouping.Month:
                         return string.Format("{0:D2} {1:D2}:{2:D2}:{3:D2}.{4}", date.Day, date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
-                    case FilterDateTimeGrouping.Day:
+                    case ADGVFilterMenuDateTimeGrouping.Day:
                         return string.Format("{0:D2}:{1:D2}:{2:D2}.{3}", date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
-                    case FilterDateTimeGrouping.Hour:
+                    case ADGVFilterMenuDateTimeGrouping.Hour:
                         return string.Format("{0:D2}:{1:D2}.{2}", date.Minute, date.Second, date.Millisecond.ToString("D3"));
-                    case FilterDateTimeGrouping.Minute:
+                    case ADGVFilterMenuDateTimeGrouping.Minute:
                         return string.Format("{0:D2}.{1}", date.Second, date.Millisecond.ToString("D3"));
                     default:
                         return string.Format("{0} {1:D2}:{2:D2}:{3:D2}.{4}", date.ToShortDateString(), date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
@@ -740,10 +741,10 @@ namespace ADGV
             {
                 switch (grouping)
                 {
-                    case FilterDateTimeGrouping.None:
-                    case FilterDateTimeGrouping.Year:
+                    case ADGVFilterMenuDateTimeGrouping.None:
+                    case ADGVFilterMenuDateTimeGrouping.Year:
                         return date.ToShortDateString();
-                    case FilterDateTimeGrouping.Month:
+                    case ADGVFilterMenuDateTimeGrouping.Month:
                         return date.Day.ToString("D2");
                     default:
                         return "--:--";
@@ -778,13 +779,13 @@ namespace ADGV
 
                     if (nonullsCnt > 0)
                     {
-                        if (this.DataType == FilterDataType.DateTime)
+                        if (this.DataType == ADGVFilterMenuDataType.DateTime)
                         {
                             #region Datetime
 
                             bool hasTime = values.OfType<DateTime>().Any(d => d.Hour > 0 || d.Minute > 0 || d.Second > 0 || d.Millisecond > 0);
 
-                            if (this.dateTimeGrouping == FilterDateTimeGrouping.None)
+                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.None)
                             {
                                 foreach (var d in values.OfType<DateTime>().OrderBy(d => d))
                                     nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
@@ -801,7 +802,7 @@ namespace ADGV
                                     var yearnode = TripleTreeNode.CreateYearNode(y.Key.ToString(), y.Key);
                                     nodes.Add(yearnode);
 
-                                    if (this.dateTimeGrouping == FilterDateTimeGrouping.Year)
+                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Year)
                                     {
                                         foreach (var d in y)
                                             yearnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
@@ -817,7 +818,7 @@ namespace ADGV
                                         {
                                             var monthnode = yearnode.CreateChildNode(this.months[m.Key], m.Key);
 
-                                            if (this.dateTimeGrouping == FilterDateTimeGrouping.Month || !hasTime)
+                                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Month || !hasTime)
                                             {
                                                 foreach (var d in m)
                                                     monthnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
@@ -833,7 +834,7 @@ namespace ADGV
                                                 {
                                                     var daysnode = monthnode.CreateChildNode(d.Key.ToString("D2"), d.Key);
 
-                                                    if (this.dateTimeGrouping == FilterDateTimeGrouping.Day)
+                                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Day)
                                                     {
                                                         foreach (var t in d)
                                                             daysnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
@@ -849,7 +850,7 @@ namespace ADGV
                                                         {
                                                             var hoursnode = daysnode.CreateChildNode(h.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_hour"), h.Key);
 
-                                                            if (this.dateTimeGrouping == FilterDateTimeGrouping.Hour)
+                                                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Hour)
                                                             {
                                                                 foreach (var t in h)
                                                                     hoursnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
@@ -865,7 +866,7 @@ namespace ADGV
                                                                 {
                                                                     var minsnode = hoursnode.CreateChildNode(mn.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_minute"), mn.Key);
 
-                                                                    if (this.dateTimeGrouping == FilterDateTimeGrouping.Minute)
+                                                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Minute)
                                                                     {
                                                                         foreach (var t in mn)
                                                                             minsnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
@@ -902,7 +903,7 @@ namespace ADGV
                             }
                             #endregion Datetime
                         }
-                        else if (this.DataType == FilterDataType.Boolean)
+                        else if (this.DataType == ADGVFilterMenuDataType.Boolean)
                         {
                             if (nonullsCnt > 1)
                             {
@@ -1101,14 +1102,14 @@ namespace ADGV
 
             if (nodes.Count() > 0)
             {
-                if (this.DataType == FilterDataType.Boolean)
+                if (this.DataType == ADGVFilterMenuDataType.Boolean)
                 {
                     if (nodes.Count() == 1)
                         sb.Append(nodes.First().Value.ToString());
                 }
                 else
                 {
-                    if (this.DataType == FilterDataType.DateTime)
+                    if (this.DataType == ADGVFilterMenuDataType.DateTime)
                     {
                         foreach (var d in nodes.SelectMany(n => n.AllNodes)
                             .Where(cn => cn.CheckState == CheckState.Checked && cn.NodeType == TripleTreeNodeType.MSecDateTimeNode)
@@ -1117,12 +1118,12 @@ namespace ADGV
                             sb.Append("'" + d.ToString("o") + "', ");
                         }
                     }
-                    else if (this.DataType == FilterDataType.Int)
+                    else if (this.DataType == ADGVFilterMenuDataType.Int)
                     {
                         foreach (var n in nodes)
                             sb.Append(n.Value.ToString() + ", ");
                     }
-                    else if (this.DataType == FilterDataType.Float)
+                    else if (this.DataType == ADGVFilterMenuDataType.Float)
                     {
                         foreach (var n in nodes)
                             sb.Append(n.Value.ToString().Replace(",", ".") + ", ");
@@ -1139,7 +1140,7 @@ namespace ADGV
             return sb.ToString();
         }
 
-        private void SetCustomFilter(int filtersMenuItemIndex)
+        private void SetCustomFilter(int filtersMenuItemIndex, bool fireEvent = true)
         {
             String newFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Tag.ToString();
             String newViewFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text;
@@ -1165,29 +1166,29 @@ namespace ADGV
 
             this.SetNodesCheckedState(this.CheckList.Nodes, false);
             this.filterNodes = this.CloneNodes(this.CheckList.Nodes);
-            this.ActiveFilterType = FilterMenuFilterType.Custom;
+            this.ActiveFilterType = ADGVFilterType.Custom;
             this.FiltersMenuItem.Checked = true;
             this.okButton.Enabled = false;
-            
-            if (newFilterString != this.FilterString)
+
+            if (fireEvent && newFilterString != this.FilterString)
             {
                 this.FilterString = newFilterString;    
                 this.FilterChanged(this, new EventArgs());
             }
         }
       
-        private void SetSortingUI(FilterMenuSortType sort)
+        private void SetSortingUI(ADGVSortType sort)
         {
             this.ActiveSortType = sort;
 
             switch (sort)
             {
-                case FilterMenuSortType.ASC:
+                case ADGVSortType.ASC:
                     this.SortASCMenuItem.Checked = true;
                     this.SortDESCMenuItem.Checked = false;
                     this.SortString = "[{0}] ASC";
                     break;
-                case FilterMenuSortType.DESC:
+                case ADGVSortType.DESC:
                     this.SortASCMenuItem.Checked = false;
                     this.SortDESCMenuItem.Checked = true;
                     this.SortString = "[{0}] DESC";
@@ -1248,7 +1249,7 @@ namespace ADGV
 
         private void SortASCMenuItem_Click(object sender, EventArgs e)
         {
-            this.SetSortingUI(FilterMenuSortType.ASC);
+            this.SetSortingUI(ADGVSortType.ASC);
 
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
@@ -1258,7 +1259,7 @@ namespace ADGV
         
         private void SortDESCMenuItem_Click(object sender, EventArgs e)
         {
-            this.SetSortingUI(FilterMenuSortType.DESC);
+            this.SetSortingUI(ADGVSortType.DESC);
 
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
@@ -1271,7 +1272,7 @@ namespace ADGV
             if (this.checkListChanged)
                 this.LoadNodes(this.startingNodes);
 
-            this.ClearSorting(FilterMenuSortType.None, true);
+            this.ClearSorting(true);
         }
 
         #endregion Sorting Interface events
@@ -1373,7 +1374,7 @@ namespace ADGV
                 CancelFilterMenuItem_Click(null, new EventArgs());
             else
             {
-                this.ActiveFilterType = FilterMenuFilterType.CheckList;
+                this.ActiveFilterType = ADGVFilterType.CheckList;
                 string newfilter = "";
 
                 if (this.CheckList.Nodes.Count > 1)
@@ -1384,9 +1385,9 @@ namespace ADGV
 
                         if (filter.Length > 0)
                         {
-                            if (this.DataType == FilterDataType.Boolean)
+                            if (this.DataType == ADGVFilterMenuDataType.Boolean)
                                 newfilter = "[{0}]=" + filter;
-                            else if (this.DataType == FilterDataType.Float)
+                            else if (this.DataType == ADGVFilterMenuDataType.Float)
                                 newfilter = "Convert([{0}],System.String) IN (" + filter + ")";
                             else
                                 newfilter = "[{0}] IN (" + filter + ")";
@@ -1400,7 +1401,7 @@ namespace ADGV
                         else
                             newfilter = "[{0}] IS NULL";
                     }
-                    else if (this.DataType == FilterDataType.Boolean && newfilter == "")
+                    else if (this.DataType == ADGVFilterMenuDataType.Boolean && newfilter == "")
                     {
                         newfilter = "[{0}] NOT IS NULL";
                     }

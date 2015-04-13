@@ -7,7 +7,7 @@ namespace ADGV
 {
     public partial class SetFilterForm : Form
     {
-        private FilterDataType filterType;
+        private ADGVFilterMenuDataType filterType;
         private ResourceManager RM = null;
         private Control val1contol = null;
         private Control val2contol = null;
@@ -33,14 +33,14 @@ namespace ADGV
             InitializeComponent();
         }
 
-        public SetFilterForm(FilterDataType dataType)
+        public SetFilterForm(ADGVFilterMenuDataType dataType)
             : this()
         {
             this.filterType = dataType;
             
             switch (this.filterType)
             {
-                case FilterDataType.DateTime:
+                case ADGVFilterMenuDataType.DateTime:
                     this.val1contol = new DateTimePicker();
                     this.val2contol = new DateTimePicker();
 
@@ -59,8 +59,8 @@ namespace ADGV
                     });
                     break;
 
-                case FilterDataType.Int:
-                case FilterDataType.Float:
+                case ADGVFilterMenuDataType.Int:
+                case ADGVFilterMenuDataType.Float:
                     this.val1contol = new TextBox();
                     this.val2contol = new TextBox();
                     this.val1contol.TextChanged += eControlTextChanged;
@@ -146,7 +146,7 @@ namespace ADGV
 
             switch (this.filterType)
             {
-                case FilterDataType.DateTime:
+                case ADGVFilterMenuDataType.DateTime:
                     DateTime dt = ((DateTimePicker)this.val1contol).Value;
 
                     if (this.FilterTypeComboBox.Text == this.RM.GetString("setfilterform_filtertypecombobox_equal"))
@@ -179,8 +179,8 @@ namespace ADGV
                     }
                     break;
 
-                case FilterDataType.Int:
-                case FilterDataType.Float:
+                case ADGVFilterMenuDataType.Int:
+                case ADGVFilterMenuDataType.Float:
 
                     String num = this.val1contol.Text.Replace(",", ".");
 
@@ -261,12 +261,12 @@ namespace ADGV
             Boolean hasErrors = false;
             switch (this.filterType)
             {
-                case FilterDataType.Int:
+                case ADGVFilterMenuDataType.Int:
                     Int64 val;
                     hasErrors = !(Int64.TryParse((sender as TextBox).Text, out val));
                     break;
 
-                case FilterDataType.Float:
+                case ADGVFilterMenuDataType.Float:
                     Double val1;
                     hasErrors = !(Double.TryParse((sender as TextBox).Text, out val1));
                     break;
