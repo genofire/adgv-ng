@@ -55,7 +55,7 @@ namespace ADGVSample
 
             foreach (var bh in Enum.GetValues(typeof(ADGVColumnHeaderCellBehavior)))
                 this.behaviorComboBox.Items.Add(bh);
-            foreach (var tg in Enum.GetValues(typeof(FilterDateTimeGrouping)))
+            foreach (var tg in Enum.GetValues(typeof(ADGVFilterMenuDateTimeGrouping)))
                 this.timeGroupingComboBox.Items.Add(tg);
 
             this.columnComboBox.SelectedIndex = 0;
@@ -153,7 +153,7 @@ namespace ADGVSample
         private void timeGroupingComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             var c = this.dataGridView.Columns[this.columnComboBox.SelectedItem.ToString()];
-            this.dataGridView.SetFilterDateTimeGrouping((FilterDateTimeGrouping)this.timeGroupingComboBox.SelectedItem, c);
+            this.dataGridView.SetFilterDateTimeGrouping((ADGVFilterMenuDateTimeGrouping)this.timeGroupingComboBox.SelectedItem, c);
         }
 
         private void behaviorComboBox_SelectedIndexChanged(object sender, EventArgs e)
