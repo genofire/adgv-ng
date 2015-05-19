@@ -51,6 +51,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ADGVColumnHeaderCell.cs" />
+    <Compile Include="ADGVFilterSet.cs" />
     <Compile Include="AdvancedDataGridView.cs">
       <SubType>Component</SubType>
     </Compile>

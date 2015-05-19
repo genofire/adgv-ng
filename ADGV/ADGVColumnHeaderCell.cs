@@ -4,24 +4,51 @@ using System.Windows.Forms;
 
 namespace ADGV
 {
+    public enum ADGVColumnHeaderCellBehavior : byte
+    {
+        DisabledHidden = 0,
+        Disabled,
+        SortingStandartGlyph,
+        Sorting,
+        SortingFiltering
+    }
+    
     public class ADGVColumnHeaderCell : DataGridViewColumnHeaderCell
     {
-        private Image filterImage = Properties.Resources.AddFilter;
         private Size filterButtonImageSize = new Size(16, 16);
-        private Boolean filterButtonPressed = false;
-        private Boolean filterButtonOver = false;
+        private bool filterButtonPressed = false;
+        private bool filterButtonOver = false;
         private Rectangle filterButtonOffsetBounds = Rectangle.Empty;
         private Rectangle filterButtonImageBounds = Rectangle.Empty;
         private Padding filterButtonMargin = new Padding(3, 4, 3, 4);
-        private Boolean filterEnabled = false;
+        private ADGVColumnHeaderCellBehavior cellBehavior;
+
+        public ADGVFilterMenuDateTimeGrouping DateTimeGrouping
+        {
+            get
+            {
+                return this.FilterMenu.DateTimeGrouping;
+            }
+            set
+            {
+                if (this.DateTimeGrouping != value)
+                {
+                    this.FilterMenu.DateTimeGrouping = value;
+                }
+            }
+        }
 
         public ADGVFilterMenu FilterMenu { get; private set; }
 
-        public event ADGVFilterEventHandler FilterPopup;
+        public event ADGVFilterEventHandler FilterPopup = delegate { };
 
-        public event ADGVFilterEventHandler SortChanged;
+        public event ADGVFilterEventHandler SortChanged = delegate { };
 
-        public event ADGVFilterEventHandler FilterChanged;
+        public event ADGVFilterEventHandler FilterChanged = delegate { };
+
+        public event ADGVFilterEventHandler CellBehaviorChanged = delegate { };
+
+        public event ADGVFilterEventHandler DateTimeGroupingChanged = delegate { };
 
         public Size MinimumSize
         {
@@ -32,118 +59,70 @@ namespace ADGV
             }
         }
 
-        public ADGVFilterMenuSortType ActiveSortType
+        public ADGVSortType ActiveSortType
         {
             get
             {
-                if (this.FilterMenu != null && this.FilterEnabled)
-                    return this.FilterMenu.ActiveSortType;
-                else
-                    return ADGVFilterMenuSortType.None;
+                return this.FilterMenu.ActiveSortType;
             }
         }
 
-        public ADGVFilterMenuFilterType ActiveFilterType
+        public ADGVFilterType ActiveFilterType
         {
             get
             {
-                if (this.FilterMenu != null && this.FilterEnabled)
-                    return this.FilterMenu.ActiveFilterType;
-                else
-                    return ADGVFilterMenuFilterType.None;
+                return this.FilterMenu.ActiveFilterType;
             }
         }
 
-        public String SortString
+        public string SortString
         {
             get
             {
-                if (this.FilterMenu != null && this.FilterEnabled)
-                    return this.FilterMenu.SortString;
-                else
-                    return "";
+                return this.FilterMenu.SortString;
             }
         }
 
-        public String FilterString
+        public string FilterString
         {
             get
             {
-                if (this.FilterMenu != null && this.FilterEnabled)
-                    return this.FilterMenu.FilterString;
-                else
-                    return "";
+                return this.FilterMenu.FilterString;
             }
         }
 
-        public Boolean FilterEnabled
+        public ADGVColumnHeaderCellBehavior CellBehavior
         {
             get
             {
-                return this.filterEnabled;
+                return this.cellBehavior;
             }
             set
             {
-                if (!value)
+                if (value != this.CellBehavior)
                 {
-                    this.filterButtonPressed = false;
-                    this.filterButtonOver = false;
-                }
-
-                if (value != this.filterEnabled)
-                {
-                    this.filterEnabled = value;
-                    Boolean refreshed = false;
-                    if (this.FilterMenu.FilterString.Length > 0)
-                    {
-                        FilterMenu_FilterChanged(this, new EventArgs());
-                        refreshed = true;
-                    }
-                    if (this.FilterMenu.SortString.Length > 0)
-                    {
-                        FilterMenu_SortChanged(this, new EventArgs());
-                        refreshed = true;
-                    }
-                    if (!refreshed)
-                        this.RepaintCell();
+                    this.cellBehavior = value;
+                    this.RepaintCell();
+                    this.CellBehaviorChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
                 }
             }
         }
 
-        public Boolean DateWithTime
-        {
-            get
-            {
-                return this.FilterMenu.DateWithTime;
-            }
-            set
-            {
-                this.FilterMenu.DateWithTime = value;
-            }
-        }
-
-        public Boolean TimeFilter
-        {
-            get
-            {
-                return this.FilterMenu.TimeFilter;
-            }
-            set
-            {
-                this.FilterMenu.TimeFilter = value;
-            }
-        }
-
-        ~ADGVColumnHeaderCell()
+        protected override void Dispose(bool disposing)
         {
             if (this.FilterMenu != null)
             {
                 this.FilterMenu.FilterChanged -= FilterMenu_FilterChanged;
                 this.FilterMenu.SortChanged -= FilterMenu_SortChanged;
+                this.FilterMenu.DateTimeGroupingChanged -= FilterMenu_DateTimeGroupingChanged;
+                this.FilterMenu.Dispose();
+                this.FilterMenu = null;
             }
+
+            base.Dispose(disposing);
         }
 
-        public ADGVColumnHeaderCell(DataGridViewColumnHeaderCell oldCell, Boolean FilterEnabled = false)
+        public ADGVColumnHeaderCell(DataGridViewColumnHeaderCell oldCell, ADGVColumnHeaderCellBehavior cellBehavior)
         {
             this.Tag = oldCell.Tag;
             this.ErrorText = oldCell.ErrorText;
@@ -152,33 +131,45 @@ namespace ADGV
             this.ValueType = oldCell.ValueType;
             this.ContextMenuStrip = oldCell.ContextMenuStrip;
             this.Style = oldCell.Style;
-            this.filterEnabled = FilterEnabled;
-
+            this.cellBehavior = cellBehavior;
+            
             ADGVColumnHeaderCell oldADGVCell = oldCell as ADGVColumnHeaderCell;
-
-            if (oldADGVCell != null && oldADGVCell.FilterMenu != null)
+                        
+            if (oldADGVCell != null)
             {
-                this.FilterMenu = oldADGVCell.FilterMenu;
-                this.filterImage = oldADGVCell.filterImage;
+                if (oldADGVCell.FilterMenu != null)
+                    this.FilterMenu = oldADGVCell.FilterMenu.Clone() as ADGVFilterMenu;
+                else
+                    this.FilterMenu = new ADGVFilterMenu(oldCell.OwningColumn.ValueType);
+
                 this.filterButtonPressed = oldADGVCell.filterButtonPressed;
                 this.filterButtonOver = oldADGVCell.filterButtonOver;
                 this.filterButtonOffsetBounds = oldADGVCell.filterButtonOffsetBounds;
                 this.filterButtonImageBounds = oldADGVCell.filterButtonImageBounds;
-
-                this.FilterMenu.FilterChanged += new EventHandler(FilterMenu_FilterChanged);
-                this.FilterMenu.SortChanged += new EventHandler(FilterMenu_SortChanged);
             }
             else
             {
                 this.FilterMenu = new ADGVFilterMenu(oldCell.OwningColumn.ValueType);
-                this.FilterMenu.FilterChanged += new EventHandler(FilterMenu_FilterChanged);
-                this.FilterMenu.SortChanged += new EventHandler(FilterMenu_SortChanged);
             }
+                        
+            this.FilterMenu.FilterChanged += FilterMenu_FilterChanged;
+            this.FilterMenu.SortChanged += FilterMenu_SortChanged;
+            this.FilterMenu.DateTimeGroupingChanged += FilterMenu_DateTimeGroupingChanged;
+        }
+
+        public void SetCustomFilter(string filter, string filterName = null, bool fireEvent = false)
+        {
+            this.FilterMenu.SetCustomFilter(filter, filterName, fireEvent);
+        }
+
+        void FilterMenu_DateTimeGroupingChanged(object sender, EventArgs e)
+        {
+            this.DateTimeGroupingChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
         }
 
         public override object Clone()
         {
-            return new ADGVColumnHeaderCell(this, this.FilterEnabled);
+            return new ADGVColumnHeaderCell(this, this.CellBehavior);
         }
 
         private void RepaintCell()
@@ -187,67 +178,39 @@ namespace ADGV
                 this.DataGridView.InvalidateCell(this);
         }
 
-        internal void ClearSorting()
+        public void ClearSorting(bool fireEvent = false)
         {
-            if (this.FilterMenu != null && this.FilterEnabled)
-            {
-                this.FilterMenu.ClearSorting();
-                this.RefreshImage();
-                this.RepaintCell();
-            }
+            this.FilterMenu.ClearSorting(fireEvent);
+            this.RepaintCell();
         }
 
-        internal void ClearFilter()
+        public void SetSorting(ADGVSortType sort, bool fireEvent = false)
         {
-            if (this.FilterMenu != null && this.FilterEnabled)
-            {
-                this.FilterMenu.ClearFilter();
-                this.RefreshImage();
-                this.RepaintCell();
-            }
+            this.FilterMenu.SetSorting(sort, fireEvent);
+            this.RepaintCell();
         }
 
-        private void RefreshImage()
+        public void ClearFilter(bool fireEvent = false)
         {
-            if (this.ActiveFilterType == ADGVFilterMenuFilterType.Loaded)
-            {
-                this.filterImage = Properties.Resources.SavedFilter;
-            }
-            else
-                if (this.ActiveFilterType == ADGVFilterMenuFilterType.None)
-                {
-                    if (this.ActiveSortType == ADGVFilterMenuSortType.None)
-                        this.filterImage = Properties.Resources.AddFilter;
-                    else if (this.ActiveSortType == ADGVFilterMenuSortType.ASC)
-                        this.filterImage = Properties.Resources.ASC;
-                    else
-                        this.filterImage = Properties.Resources.DESC;
-                }
-                else
-                {
-                    if (this.ActiveSortType == ADGVFilterMenuSortType.None)
-                        this.filterImage = Properties.Resources.Filter;
-                    else if (this.ActiveSortType == ADGVFilterMenuSortType.ASC)
-                        this.filterImage = Properties.Resources.FilterASC;
-                    else
-                        this.filterImage = Properties.Resources.FilterDESC;
-                }
+            this.FilterMenu.ClearFilter(fireEvent);
+            this.RepaintCell();
         }
 
+        public void SaveCurrentFilter()
+        {
+            this.FilterMenu.SaveCurrentFilter();
+        }
+        
         private void FilterMenu_FilterChanged(object sender, EventArgs e)
         {
-            RefreshImage();
             this.RepaintCell();
-            if (this.FilterEnabled && this.FilterChanged != null)
-                this.FilterChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
+            this.FilterChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
         }
 
         private void FilterMenu_SortChanged(object sender, EventArgs e)
         {
-            RefreshImage();
             this.RepaintCell();
-            if (this.FilterEnabled && this.SortChanged != null)
-                this.SortChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
+            this.SortChanged(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
         }
 
         protected override void Paint(
@@ -258,30 +221,75 @@ namespace ADGV
             DataGridViewAdvancedBorderStyle advancedBorderStyle,
             DataGridViewPaintParts paintParts)
         {
-            if (this.FilterEnabled && this.SortGlyphDirection != SortOrder.None)
+            if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingStandartGlyph)
+            {
+                switch (this.ActiveSortType)
+                {
+                    case ADGVSortType.ASC:
+                        this.SortGlyphDirection = SortOrder.Ascending;
+                        break;
+                    case ADGVSortType.DESC:
+                        this.SortGlyphDirection = SortOrder.Descending;
+                        break;
+                    case ADGVSortType.None:
+                        this.SortGlyphDirection = SortOrder.None;
+                        break;
+                }
+            }
+            else
                 this.SortGlyphDirection = SortOrder.None;
 
             base.Paint(graphics, clipBounds, cellBounds, rowIndex,
                 cellState, value, formattedValue,
                 errorText, cellStyle, advancedBorderStyle, paintParts);
 
-            if (this.FilterEnabled && paintParts.HasFlag(DataGridViewPaintParts.ContentBackground))
+            if (this.CellBehavior != ADGVColumnHeaderCellBehavior.SortingStandartGlyph && this.CellBehavior != ADGVColumnHeaderCellBehavior.DisabledHidden && paintParts.HasFlag(DataGridViewPaintParts.ContentBackground))
             {
-                this.filterButtonOffsetBounds = GetFilterBounds(true);
-                this.filterButtonImageBounds = GetFilterBounds(false);
+                Image filterImage = Properties.Resources.AddFilter;
+
+                if (this.cellBehavior == ADGVColumnHeaderCellBehavior.Sorting || this.ActiveFilterType == ADGVFilterType.None)
+                    switch (this.ActiveSortType)
+                    {
+                        case ADGVSortType.ASC:
+                            filterImage = Properties.Resources.ASC;
+                            break;
+                        case ADGVSortType.DESC:
+                            filterImage = Properties.Resources.DESC;
+                            break;
+                        case ADGVSortType.None:
+                            filterImage = Properties.Resources.AddFilter;
+                            break;
+                    }
+                else
+                    switch (this.ActiveSortType)
+                    {
+                        case ADGVSortType.ASC:
+                            filterImage = Properties.Resources.FilterASC;
+                            break;
+                        case ADGVSortType.DESC:
+                            filterImage = Properties.Resources.FilterDESC;
+                            break;
+                        case ADGVSortType.None:
+                            filterImage = Properties.Resources.Filter;
+                            break;
+                    }
+
+                this.filterButtonOffsetBounds = this.GetFilterButtonBounds(true);
+                this.filterButtonImageBounds = this.GetFilterButtonBounds(false);
                 Rectangle buttonBounds = this.filterButtonOffsetBounds;
                 if (buttonBounds != null && clipBounds.IntersectsWith(buttonBounds))
                 {
                     ControlPaint.DrawBorder(graphics, buttonBounds, Color.Gray, ButtonBorderStyle.Solid);
                     buttonBounds.Inflate(-1, -1);
-                    using (Brush b = new SolidBrush(this.filterButtonOver ? Color.LightGray : Color.White))
+                    using (Brush b = new SolidBrush((this.CellBehavior != ADGVColumnHeaderCellBehavior.Disabled && this.filterButtonOver) ? Color.LightGray : Color.White))
                         graphics.FillRectangle(b, buttonBounds);
-                    graphics.DrawImage(this.filterImage, buttonBounds);
+
+                    graphics.DrawImage(filterImage, buttonBounds);
                 }
             }
         }
 
-        private Rectangle GetFilterBounds(Boolean withOffset = true)
+        private Rectangle GetFilterButtonBounds(Boolean withOffset = true)
         {
             Rectangle cell = this.DataGridView.GetCellDisplayRectangle(this.ColumnIndex, -1, false);
 
@@ -293,7 +301,7 @@ namespace ADGV
 
         protected override void OnMouseMove(DataGridViewCellMouseEventArgs e)
         {
-            if (this.FilterEnabled)
+            if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering || this.CellBehavior == ADGVColumnHeaderCellBehavior.Sorting)
             {
                 if (this.filterButtonImageBounds.Contains(e.X, e.Y) && !this.filterButtonOver)
                 {
@@ -306,59 +314,90 @@ namespace ADGV
                     this.RepaintCell();
                 }
             }
+
             base.OnMouseMove(e);
         }
 
         protected override void OnMouseDown(DataGridViewCellMouseEventArgs e)
         {
-            if (this.FilterEnabled)
+            if (e.Button == MouseButtons.Left && !this.filterButtonPressed)
             {
-                if (this.filterButtonImageBounds.Contains(e.X, e.Y) && e.Button == MouseButtons.Left && !this.filterButtonPressed)
+                if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering || this.CellBehavior == ADGVColumnHeaderCellBehavior.Sorting)
+                {
+                    if (this.filterButtonImageBounds.Contains(e.X, e.Y))
+                    {
+                        this.filterButtonPressed = true;
+                        this.filterButtonOver = true;
+                        this.RepaintCell();
+                    }
+                }
+                else if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingStandartGlyph)
                 {
                     this.filterButtonPressed = true;
-                    this.filterButtonOver = true;
                     this.RepaintCell();
                 }
             }
-            else
-                base.OnMouseDown(e);
+
+            base.OnMouseDown(e);
         }
 
         protected override void OnMouseUp(DataGridViewCellMouseEventArgs e)
         {
-            if (this.FilterEnabled)
+            if (e.Button == MouseButtons.Left && this.filterButtonPressed)
             {
-                if (e.Button == MouseButtons.Left && this.filterButtonPressed)
-                {
-                    this.filterButtonPressed = false;
-                    this.filterButtonOver = false;
-                    this.RepaintCell();
-                    if (this.filterButtonImageBounds.Contains(e.X, e.Y) && this.FilterPopup != null)
+                this.filterButtonPressed = false;
+
+                if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingStandartGlyph)
+                    switch (this.ActiveSortType)
                     {
-                        this.FilterPopup(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
+                        case ADGVSortType.ASC:
+                            this.FilterMenu.SetSorting(ADGVSortType.DESC, true);
+                            break;
+                        case ADGVSortType.DESC:
+                            this.FilterMenu.SetSorting(ADGVSortType.None, true);
+                            break;
+                        case ADGVSortType.None:
+                            this.FilterMenu.SetSorting(ADGVSortType.ASC, true);
+                            break;
+                    }
+                else if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering || this.CellBehavior == ADGVColumnHeaderCellBehavior.Sorting)
+                {
+                    this.filterButtonOver = false;
+                    
+                    if (this.filterButtonImageBounds.Contains(e.X, e.Y))
+                    {
+                        if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering)
+                            this.FilterPopup(this, new ADGVFilterEventArgs(this.FilterMenu, this.OwningColumn));
+                        else
+                            switch (this.ActiveSortType)
+                            {
+                                case ADGVSortType.ASC:
+                                    this.FilterMenu.SetSorting(ADGVSortType.DESC, true);
+                                    break;
+                                case ADGVSortType.DESC:
+                                    this.FilterMenu.SetSorting(ADGVSortType.None, true);
+                                    break;
+                                case ADGVSortType.None:
+                                    this.FilterMenu.SetSorting(ADGVSortType.ASC, true);
+                                    break;
+                            }
                     }
                 }
+                this.RepaintCell();
             }
-            else
-                base.OnMouseUp(e);
+
+            base.OnMouseUp(e);
         }
 
         protected override void OnMouseLeave(int rowIndex)
         {
-            if (this.FilterEnabled && this.filterButtonOver)
+            if (this.CellBehavior == ADGVColumnHeaderCellBehavior.SortingFiltering || this.CellBehavior == ADGVColumnHeaderCellBehavior.Sorting)
             {
                 this.filterButtonOver = false;
                 this.RepaintCell();
             }
 
             base.OnMouseLeave(rowIndex);
-        }
-
-        public void SetLoadedFilterMode(Boolean Enabled)
-        {
-            this.FilterMenu.SetLoadedFilterMode(Enabled);
-            this.RefreshImage();
-            this.RepaintCell();
         }
     }
 
@@ -369,6 +408,14 @@ namespace ADGV
         public ADGVFilterMenu FilterMenu { get; private set; }
 
         public DataGridViewColumn Column { get; private set; }
+
+        public ADGVColumnHeaderCell HeaderCell
+        {
+            get
+            {
+                return this.Column.HeaderCell as ADGVColumnHeaderCell;
+            }
+        }
 
         public ADGVFilterEventArgs(ADGVFilterMenu filterMenu, DataGridViewColumn column)
         {

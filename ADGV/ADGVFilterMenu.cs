@@ -8,24 +8,43 @@ using System.Windows.Forms;
 
 namespace ADGV
 {
-    public enum ADGVFilterMenuFilterType : byte
+    public enum ADGVFilterType : byte
     {
         None = 0,
-        Custom = 1,
-        CheckList = 2,
-        Loaded = 3
+        Custom,
+        CheckList
     }
 
-    public enum ADGVFilterMenuSortType : byte
+    public enum ADGVSortType : byte
     {
         None = 0,
-        ASC = 1,
-        DESC = 2
+        ASC,
+        DESC
+    }
+
+    public enum ADGVFilterMenuDateTimeGrouping : byte
+    {
+        None = 0,
+        Year,
+        Month,
+        Day,
+        Hour,
+        Minute,
+        Second
+    }
+
+    public enum ADGVFilterMenuDataType : byte
+    {
+        Text = 0,
+        Int,
+        Float,
+        DateTime,
+        Boolean
     }
 
     public class ADGVFilterMenu : ContextMenuStrip
     {
-        #region ToolStripMenuItems
+        #region Controls
 
         private ToolStripMenuItem SortASCMenuItem;
         private ToolStripMenuItem SortDESCMenuItem;
@@ -50,93 +69,101 @@ namespace ADGV
         private Panel CheckFilterListPanel;
         private Panel CheckFilterListButtonsPanel;
 
-        #endregion ToolStripMenuItems
+        #endregion Controls
 
-        private Dictionary<Int32, String> months = null;
+        private string[] months = null;
         private ResourceManager RM = null;
-        private ADGVFilterMenuFilterType activeFilterType = ADGVFilterMenuFilterType.None;
-        private ADGVFilterMenuSortType activeSortType = ADGVFilterMenuSortType.None;
-        private String sortString = null;
-        private String filterString = null;
-        private TripleTreeNode[] startingNodes = null;
-        private TripleTreeNode[] filterNodes = null;
-        private static Point resizeStartPoint = new Point(1, 1);
+        private string sortString = null;
+        private string filterString = null;
+        private IEnumerable<TripleTreeNode> startingNodes = null;
+        private IEnumerable<TripleTreeNode> filterNodes = null;
+        private TripleTreeNode emptysNode = null;
+        private TripleTreeNode allsNode = null;
+        private bool checkListChanged = false;
+        
         private Point resizeEndPoint = new Point(-1, -1);
+        private ADGVFilterMenuDateTimeGrouping dateTimeGrouping = ADGVFilterMenuDateTimeGrouping.Second;
 
-        public Type DataType { get; private set; }
+        public ADGVFilterMenuDataType DataType { get; private set; }
 
-        public Boolean DateWithTime { get; set; }
-
-        public Boolean TimeFilter { get; set; }
-
-        public ADGVFilterMenuSortType ActiveSortType
+        public ADGVFilterMenuDateTimeGrouping DateTimeGrouping 
         {
             get
             {
-                return this.activeSortType;
+                return this.dateTimeGrouping;
+            }
+            set
+            {
+                if (this.dateTimeGrouping != value)
+                {
+                    this.dateTimeGrouping = value;
+
+                    if (this.DataType == ADGVFilterMenuDataType.DateTime)
+                    {
+                        if (this.filterNodes != null)
+                            this.filterNodes = this.RecreateDateTimeNodes(this.filterNodes);
+
+                        if (this.CheckList.Nodes.Count > 0)
+                            this.LoadNodes(this.RecreateDateTimeNodes(this.CheckList.Nodes.Cast<TripleTreeNode>()));
+                    }
+
+                    this.DateTimeGroupingChanged(this, new EventArgs());
+                }
             }
         }
 
-        public ADGVFilterMenuFilterType ActiveFilterType
-        {
-            get
-            {
-                return this.activeFilterType;
-            }
-        }
+        public ADGVSortType ActiveSortType { get; private set; }
 
-        public String SortString
+        public ADGVFilterType ActiveFilterType { get; private set; }
+        
+        public string SortString
         {
             get
             {
-                return this.sortString == null ? "" : this.sortString;
+                return String.IsNullOrWhiteSpace(this.sortString) ? "" : this.sortString;
             }
             private set
             {
-                this.CancelSortMenuItem.Enabled = (value != null && value.Length > 0);
-                this.sortString = value;
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
+
+                if (value != this.sortString)
+                {
+                    this.sortString = value;
+                    this.CancelSortMenuItem.Enabled = this.sortString != null;
+                }
             }
         }
 
-        public String FilterString
+        public string FilterString
         {
             get
             {
-                return this.filterString == null ? "" : this.filterString;
+                return String.IsNullOrWhiteSpace(this.filterString) ? "" : this.filterString;
             }
 
             private set
             {
-                this.CancelFilterMenuItem.Enabled = (value != null && value.Length > 0);
-                this.filterString = value;
+                if (String.IsNullOrWhiteSpace(value))
+                    value = null;
+
+                if (value != this.filterString)
+                {
+                    this.filterString = value;
+                    this.CancelFilterMenuItem.Enabled = this.filterString != null;
+                }
             }
         }
 
-        public event EventHandler SortChanged;
+        public event EventHandler SortChanged = delegate { };
 
-        public event EventHandler FilterChanged;
+        public event EventHandler FilterChanged = delegate { };
 
-        public ADGVFilterMenu(Type DataType)
-            : base()
+        public event EventHandler DateTimeGroupingChanged = delegate { };
+
+        private void InitializeComponent()
         {
-            this.DataType = DataType;
-            this.DateWithTime = true;
-            this.TimeFilter = false;
-
             this.RM = new System.Resources.ResourceManager("ADGV.Localization.ADGVStrings", typeof(ADGV.ADGVFilterMenu).Assembly);
-            this.months = new Dictionary<Int32, String>();
-            this.months.Add(1, this.RM.GetString("month1"));
-            this.months.Add(2, this.RM.GetString("month2"));
-            this.months.Add(3, this.RM.GetString("month3"));
-            this.months.Add(4, this.RM.GetString("month4"));
-            this.months.Add(5, this.RM.GetString("month5"));
-            this.months.Add(6, this.RM.GetString("month6"));
-            this.months.Add(7, this.RM.GetString("month7"));
-            this.months.Add(8, this.RM.GetString("month8"));
-            this.months.Add(9, this.RM.GetString("month9"));
-            this.months.Add(10, this.RM.GetString("month10"));
-            this.months.Add(11, this.RM.GetString("month11"));
-            this.months.Add(12, this.RM.GetString("month12"));
 
             #region Interface
 
@@ -161,8 +188,10 @@ namespace ADGV
             this.CheckFilterListButtonsPanel = new Panel();
             this.CheckFilterListButtonsControlHost = new ToolStripControlHost(this.CheckFilterListButtonsPanel);
             this.CheckFilterListControlHost = new ToolStripControlHost(this.CheckFilterListPanel);
-            this.ResizeBoxControlHost = new ToolStripControlHost(new Control());//(this.ResizePictureBox);
+            this.ResizeBoxControlHost = new ToolStripControlHost(new Control());
+
             this.SuspendLayout();
+
             //
             // MenuStrip
             //
@@ -180,7 +209,7 @@ namespace ADGV
             this.SortASCMenuItem.AutoSize = false;
             this.SortASCMenuItem.Size = new System.Drawing.Size(this.Width - 1, 22);
             this.SortASCMenuItem.Click += new System.EventHandler(this.SortASCMenuItem_Click);
-            this.SortASCMenuItem.MouseEnter += new System.EventHandler(this.SortASCMenuItem_MouseEnter);
+            this.SortASCMenuItem.MouseEnter += new System.EventHandler(this.MenuItem_MouseEnter);
             this.SortASCMenuItem.ImageScaling = ToolStripItemImageScaling.None;
             //
             // SortDESCMenuItem
@@ -189,7 +218,7 @@ namespace ADGV
             this.SortDESCMenuItem.AutoSize = false;
             this.SortDESCMenuItem.Size = new System.Drawing.Size(this.Width - 1, 22);
             this.SortDESCMenuItem.Click += new System.EventHandler(this.SortDESCMenuItem_Click);
-            this.SortDESCMenuItem.MouseEnter += new System.EventHandler(this.SortASCMenuItem_MouseEnter);
+            this.SortDESCMenuItem.MouseEnter += new System.EventHandler(this.MenuItem_MouseEnter);
             this.SortDESCMenuItem.ImageScaling = ToolStripItemImageScaling.None;
             //
             // CancelSortMenuItem
@@ -200,7 +229,7 @@ namespace ADGV
             this.CancelSortMenuItem.Size = new System.Drawing.Size(this.Width - 1, 22);
             this.CancelSortMenuItem.Text = this.RM.GetString("cancelsortmenuitem_text");
             this.CancelSortMenuItem.Click += new System.EventHandler(this.CancelSortMenuItem_Click);
-            this.CancelSortMenuItem.MouseEnter += new System.EventHandler(this.SortASCMenuItem_MouseEnter);
+            this.CancelSortMenuItem.MouseEnter += new System.EventHandler(this.MenuItem_MouseEnter);
             //
             // toolStripSeparator1MenuItem
             //
@@ -215,7 +244,7 @@ namespace ADGV
             this.CancelFilterMenuItem.Size = new System.Drawing.Size(this.Width - 1, 22);
             this.CancelFilterMenuItem.Text = this.RM.GetString("cancelfiltermenuitem_text");
             this.CancelFilterMenuItem.Click += new System.EventHandler(this.CancelFilterMenuItem_Click);
-            this.CancelFilterMenuItem.MouseEnter += new System.EventHandler(this.SortASCMenuItem_MouseEnter);
+            this.CancelFilterMenuItem.MouseEnter += new System.EventHandler(this.MenuItem_MouseEnter);
             //
             // SetupFilterMenuItem
             //
@@ -224,7 +253,7 @@ namespace ADGV
             this.SetupFilterMenuItem.Text = this.RM.GetString("setupfiltermenuitem_text");
             this.SetupFilterMenuItem.Click += new System.EventHandler(this.SetupFilterMenuItem_Click);
             //
-            // toolStripMenuItem2
+            // toolStripSeparator2MenuItem
             //
             this.toolStripSeparator2MenuItem.Name = "toolStripSeparator2MenuItem";
             this.toolStripSeparator2MenuItem.Size = new System.Drawing.Size(149, 6);
@@ -237,9 +266,9 @@ namespace ADGV
             this.lastfilter1MenuItem.Tag = "0";
             this.lastfilter1MenuItem.Text = null;
             this.lastfilter1MenuItem.Visible = false;
-            this.lastfilter1MenuItem.Click += new System.EventHandler(this.lastfilter1MenuItem_Click);
-            this.lastfilter1MenuItem.TextChanged += new System.EventHandler(this.lastfilter1MenuItem_TextChanged);
-            this.lastfilter1MenuItem.VisibleChanged += new System.EventHandler(this.lastfilter1MenuItem_VisibleChanged);
+            this.lastfilter1MenuItem.Click += new System.EventHandler(this.lastfilterMenuItem_Click);
+            this.lastfilter1MenuItem.TextChanged += new System.EventHandler(this.lastfilterMenuItem_TextChanged);
+            this.lastfilter1MenuItem.VisibleChanged += new System.EventHandler(this.lastfilterMenuItem_VisibleChanged);
             //
             // lastfilter2MenuItem
             //
@@ -248,8 +277,8 @@ namespace ADGV
             this.lastfilter2MenuItem.Tag = "1";
             this.lastfilter2MenuItem.Text = null;
             this.lastfilter2MenuItem.Visible = false;
-            this.lastfilter2MenuItem.Click += new System.EventHandler(this.lastfilter1MenuItem_Click);
-            this.lastfilter2MenuItem.TextChanged += new System.EventHandler(this.lastfilter1MenuItem_TextChanged);
+            this.lastfilter2MenuItem.Click += new System.EventHandler(this.lastfilterMenuItem_Click);
+            this.lastfilter2MenuItem.TextChanged += new System.EventHandler(this.lastfilterMenuItem_TextChanged);
             //
             // lastfilter3MenuItem
             //
@@ -258,8 +287,8 @@ namespace ADGV
             this.lastfilter3MenuItem.Tag = "2";
             this.lastfilter3MenuItem.Text = null;
             this.lastfilter3MenuItem.Visible = false;
-            this.lastfilter3MenuItem.Click += new System.EventHandler(this.lastfilter1MenuItem_Click);
-            this.lastfilter3MenuItem.TextChanged += new System.EventHandler(this.lastfilter1MenuItem_TextChanged);
+            this.lastfilter3MenuItem.Click += new System.EventHandler(this.lastfilterMenuItem_Click);
+            this.lastfilter3MenuItem.TextChanged += new System.EventHandler(this.lastfilterMenuItem_TextChanged);
             //
             // lastfilter4MenuItem
             //
@@ -268,8 +297,8 @@ namespace ADGV
             this.lastfilter4MenuItem.Tag = "3";
             this.lastfilter4MenuItem.Text = null;
             this.lastfilter4MenuItem.Visible = false;
-            this.lastfilter4MenuItem.Click += new System.EventHandler(this.lastfilter1MenuItem_Click);
-            this.lastfilter4MenuItem.TextChanged += new System.EventHandler(this.lastfilter1MenuItem_TextChanged);
+            this.lastfilter4MenuItem.Click += new System.EventHandler(this.lastfilterMenuItem_Click);
+            this.lastfilter4MenuItem.TextChanged += new System.EventHandler(this.lastfilterMenuItem_TextChanged);
             //
             // lastfilter5MenuItem
             //
@@ -278,8 +307,8 @@ namespace ADGV
             this.lastfilter5MenuItem.Tag = "4";
             this.lastfilter5MenuItem.Text = null;
             this.lastfilter5MenuItem.Visible = false;
-            this.lastfilter5MenuItem.Click += new System.EventHandler(this.lastfilter1MenuItem_Click);
-            this.lastfilter5MenuItem.TextChanged += new System.EventHandler(this.lastfilter1MenuItem_TextChanged);
+            this.lastfilter5MenuItem.Click += new System.EventHandler(this.lastfilterMenuItem_Click);
+            this.lastfilter5MenuItem.TextChanged += new System.EventHandler(this.lastfilterMenuItem_TextChanged);
             //
             // FiltersMenuItem
             //
@@ -296,10 +325,10 @@ namespace ADGV
             this.lastfilter3MenuItem,
             this.lastfilter4MenuItem,
             this.lastfilter5MenuItem});
-            this.FiltersMenuItem.MouseEnter += new System.EventHandler(this.SortASCMenuItem_MouseEnter);
+            this.FiltersMenuItem.MouseEnter += new System.EventHandler(this.MenuItem_MouseEnter);
             this.FiltersMenuItem.Paint += new PaintEventHandler(FiltersMenuItem_Paint);
             //
-            // toolStripMenuItem3
+            // toolStripSeparator3MenuItem
             //
             this.toolStripSeparator3MenuItem.Name = "toolStripSeparator3MenuItem";
             this.toolStripSeparator3MenuItem.Size = new System.Drawing.Size(this.Width - 4, 6);
@@ -371,13 +400,13 @@ namespace ADGV
             this.CheckList.Padding = new Padding(0);
             this.CheckList.Margin = new Padding(0);
             this.CheckList.Bounds = new Rectangle(4, 4, this.CheckFilterListPanel.Width - 8, this.CheckFilterListPanel.Height - 8);
-            this.CheckList.StateImageList = GetCheckImages();
             this.CheckList.CheckBoxes = false;
+            this.CheckList.StateImageList = new ImageList();
             this.CheckList.MouseLeave += new EventHandler(CheckList_MouseLeave);
             this.CheckList.NodeMouseClick += new TreeNodeMouseClickEventHandler(CheckList_NodeMouseClick);
             this.CheckList.KeyDown += new KeyEventHandler(CheckList_KeyDown);
-            this.CheckList.MouseEnter += CheckList_MouseEnter;
-            this.CheckList.NodeMouseDoubleClick += CheckList_NodeMouseDoubleClick;
+            this.CheckList.MouseEnter += new EventHandler(CheckList_MouseEnter);
+            this.CheckList.NodeMouseDoubleClick += new TreeNodeMouseClickEventHandler(CheckList_NodeMouseDoubleClick);
             //
             // CheckFilterListButtonsPanel
             //
@@ -407,234 +436,468 @@ namespace ADGV
             this.CheckFilterListButtonsControlHost,
             this.ResizeBoxControlHost});
 
-            this.ResumeLayout(false);
-
             #endregion Interface
-
-            if (this.DataType == typeof(DateTime))
-            {
-                this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_datetime");
-                this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_datetime");
-                this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_datetime");
-                this.SortASCMenuItem.Image = Properties.Resources.ASCnum;
-                this.SortDESCMenuItem.Image = Properties.Resources.DESCnum;
-            }
-            else if (this.DataType == typeof(Boolean))
-            {
-                this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_text");
-                this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_boolean");
-                this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_boolean");
-                this.SortASCMenuItem.Image = Properties.Resources.ASCbool;
-                this.SortDESCMenuItem.Image = Properties.Resources.DESCbool;
-            }
-            else if (this.DataType == typeof(Int32) || this.DataType == typeof(Int64) || this.DataType == typeof(Int16) ||
-                this.DataType == typeof(UInt32) || this.DataType == typeof(UInt64) || this.DataType == typeof(UInt16) ||
-                this.DataType == typeof(Byte) || this.DataType == typeof(SByte) || this.DataType == typeof(Decimal) ||
-                this.DataType == typeof(Single) || this.DataType == typeof(Double))
-            {
-                this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_numeric");
-                this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_numeric");
-                this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_numeric");
-                this.SortASCMenuItem.Image = Properties.Resources.ASCnum;
-                this.SortDESCMenuItem.Image = Properties.Resources.DESCnum;
-            }
-            else
-            {
-                this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_text");
-                this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_text");
-                this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text");
-                this.SortASCMenuItem.Image = Properties.Resources.ASCtxt;
-                this.SortDESCMenuItem.Image = Properties.Resources.DESCtxt;
-            }
-
-            this.FiltersMenuItem.Enabled = this.DataType != typeof(Boolean);
-            this.FiltersMenuItem.Checked = this.ActiveFilterType == ADGVFilterMenuFilterType.Custom;
-            this.MinimumSize = new Size(this.PreferredSize.Width, this.PreferredSize.Height);
-            this.ResizeMenu(this.MinimumSize.Width, this.MinimumSize.Height);
-        }
-
-        private void CheckList_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
-        {
-            TripleTreeNode n = e.Node as TripleTreeNode;
-            SetNodesCheckedState(this.CheckList.Nodes, false);
-            n.CheckState = CheckState.Unchecked;
-            NodeCheckChange(n);
-            this.okButton_Click(this, new EventArgs());
-        }
-
-        private void CheckList_MouseEnter(object sender, EventArgs e)
-        {
-            this.CheckList.Focus();
-        }
-
-        private ImageList GetCheckImages()
-        {
-            ImageList images = new System.Windows.Forms.ImageList();
-            Bitmap unCheckImg = new Bitmap(16, 16);
-            Bitmap checkImg = new Bitmap(16, 16);
-            Bitmap mixedImg = new Bitmap(16, 16);
 
             using (Bitmap img = new Bitmap(16, 16))
             {
                 using (Graphics g = Graphics.FromImage(img))
                 {
                     CheckBoxRenderer.DrawCheckBox(g, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal);
-                    unCheckImg = (Bitmap)img.Clone();
+                    this.CheckList.StateImageList.Images.Add("uncheck", (Bitmap)img.Clone());
                     CheckBoxRenderer.DrawCheckBox(g, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal);
-                    checkImg = (Bitmap)img.Clone();
+                    this.CheckList.StateImageList.Images.Add("check", (Bitmap)img.Clone());
                     CheckBoxRenderer.DrawCheckBox(g, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal);
-                    mixedImg = (Bitmap)img.Clone();
+                    this.CheckList.StateImageList.Images.Add("mixed", (Bitmap)img.Clone());
+                }
+            }
+            this.ActiveFilterType = ADGVFilterType.None;
+            this.ActiveSortType = ADGVSortType.None;
+
+            switch (this.DataType)
+            {
+                case ADGVFilterMenuDataType.DateTime:
+                    this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_datetime");
+                    this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_datetime");
+                    this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_datetime");
+                    this.SortASCMenuItem.Image = Properties.Resources.ASCnum;
+                    this.SortDESCMenuItem.Image = Properties.Resources.DESCnum;
+                    this.months = new String[13];
+                    this.months[1] = this.RM.GetString("month1");
+                    this.months[2] = this.RM.GetString("month2");
+                    this.months[3] = this.RM.GetString("month3");
+                    this.months[4] = this.RM.GetString("month4");
+                    this.months[5] = this.RM.GetString("month5");
+                    this.months[6] = this.RM.GetString("month6");
+                    this.months[7] = this.RM.GetString("month7");
+                    this.months[8] = this.RM.GetString("month8");
+                    this.months[9] = this.RM.GetString("month9");
+                    this.months[10] = this.RM.GetString("month10");
+                    this.months[11] = this.RM.GetString("month11");
+                    this.months[12] = this.RM.GetString("month12");
+                    break;
+                case ADGVFilterMenuDataType.Boolean:
+                    this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_text");
+                    this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_boolean");
+                    this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_boolean");
+                    this.SortASCMenuItem.Image = Properties.Resources.ASCbool;
+                    this.SortDESCMenuItem.Image = Properties.Resources.DESCbool;
+                    break;
+                case ADGVFilterMenuDataType.Int:
+                case ADGVFilterMenuDataType.Float:
+                    this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_numeric");
+                    this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_numeric");
+                    this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text_numeric");
+                    this.SortASCMenuItem.Image = Properties.Resources.ASCnum;
+                    this.SortDESCMenuItem.Image = Properties.Resources.DESCnum;
+                    break;
+                default:
+                    this.FiltersMenuItem.Text = this.RM.GetString("filtersmenuitem_text_text");
+                    this.SortASCMenuItem.Text = this.RM.GetString("sortascmenuitem_text_text");
+                    this.SortDESCMenuItem.Text = this.RM.GetString("sortdescmenuitem_text");
+                    this.SortASCMenuItem.Image = Properties.Resources.ASCtxt;
+                    this.SortDESCMenuItem.Image = Properties.Resources.DESCtxt;
+                    break;
+            }
+
+            this.FiltersMenuItem.Enabled = this.DataType != ADGVFilterMenuDataType.Boolean;
+            this.FiltersMenuItem.Checked = this.ActiveFilterType == ADGVFilterType.Custom;
+            this.MinimumSize = new Size(this.PreferredSize.Width, this.PreferredSize.Height);
+            this.ResizeMenu(this.MinimumSize.Width, this.MinimumSize.Height);
+
+            this.ResumeLayout(false);
+        }
+
+        public ADGVFilterMenu(Type dataType)
+            : base()
+        {
+            if (dataType == typeof(Boolean))
+                this.DataType = ADGVFilterMenuDataType.Boolean;
+            else if (dataType == typeof(DateTime))
+                this.DataType = ADGVFilterMenuDataType.DateTime;
+            else if (dataType == typeof(Int32) || dataType == typeof(Int64) || dataType == typeof(Int16) ||
+                    dataType == typeof(UInt32) || dataType == typeof(UInt64) || dataType == typeof(UInt16) ||
+                    dataType == typeof(Byte) || dataType == typeof(SByte))
+                this.DataType = ADGVFilterMenuDataType.Int;
+            else if (dataType == typeof(Single) || dataType == typeof(Double) || dataType == typeof(Decimal))
+                this.DataType = ADGVFilterMenuDataType.Float;
+            else
+                this.DataType = ADGVFilterMenuDataType.Text;
+
+            this.InitializeComponent();
+        }
+
+        public ADGVFilterMenu(ADGVFilterMenuDataType filterDataType)
+            : base()
+        {
+            this.DataType = filterDataType;
+            this.InitializeComponent();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            this.RM = null;
+            this.emptysNode = null;
+            this.allsNode = null;
+            this.startingNodes = null;
+            this.filterNodes = null;
+            this.ClearResizeBox();
+
+            base.Dispose(disposing);
+        }
+
+        #region Public Methods
+
+        public object Clone()
+        {
+            ADGVFilterMenu m = new ADGVFilterMenu(this.DataType);
+
+            m.ActiveFilterType = this.ActiveFilterType;
+            m.ActiveSortType = this.ActiveSortType;
+            m.SortString = this.SortString;
+            m.FilterString = this.FilterString;
+            m.checkListChanged = this.checkListChanged;
+            m.resizeEndPoint = this.resizeEndPoint;
+            m.dateTimeGrouping = this.dateTimeGrouping;
+            m.LoadNodes(this.CloneNodes(this.CheckList.Nodes));
+            m.startingNodes = this.CloneNodes(this.startingNodes);
+            m.filterNodes = this.CloneNodes(this.filterNodes);
+            m.ResizeMenu(this.Width, this.Height);
+            
+            m.SortASCMenuItem.Checked = this.SortASCMenuItem.Checked;
+            m.SortDESCMenuItem.Checked = this.SortDESCMenuItem.Checked;
+            m.FiltersMenuItem.Enabled = this.FiltersMenuItem.Enabled ;
+            m.FiltersMenuItem.Checked = this.FiltersMenuItem.Checked;
+            m.okButton.Enabled = this.okButton.Enabled;
+            m.cancelButton.Enabled = this.cancelButton.Enabled;
+
+            if (!this.toolStripSeparator2MenuItem.Visible)
+            {
+                m.toolStripSeparator2MenuItem.Visible = false;
+                m.lastfilter1MenuItem.VisibleChanged -= m.lastfilterMenuItem_VisibleChanged;
+            }
+
+            for (int i = 2; i < m.FiltersMenuItem.DropDownItems.Count; i++)
+            {
+                m.FiltersMenuItem.DropDownItems[i].Text = this.FiltersMenuItem.DropDownItems[i].Text;
+                m.FiltersMenuItem.DropDownItems[i].Tag = this.FiltersMenuItem.DropDownItems[i].Tag;
+                m.FiltersMenuItem.DropDownItems[i].Visible = this.FiltersMenuItem.DropDownItems[i].Visible;
+                (m.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked;
+
+                if (!this.FiltersMenuItem.DropDownItems[i].Available)
+                {
+                    m.FiltersMenuItem.DropDownItems[i].Available = false;
+                    m.FiltersMenuItem.DropDownItems[i].TextChanged -= m.lastfilterMenuItem_TextChanged;
                 }
             }
 
-            images.Images.Add("uncheck", unCheckImg);
-            images.Images.Add("check", checkImg);
-            images.Images.Add("mixed", mixedImg);
-
-            return images;
+            return m;
         }
 
-        public static IEnumerable<DataGridViewCell> GetValuesForFilter(DataGridView grid, String columnName)
+        public static IEnumerable<object> GetValuesForFilter(DataGridView grid, String columnName, bool useFormatedValue = false)
         {
             var vals =
-                from DataGridViewRow r in grid.Rows
-                where r.IsNewRow == false
-                select r.Cells[columnName];
+                useFormatedValue ?
+                    from DataGridViewRow r in grid.Rows
+                    where r.IsNewRow == false
+                    select r.Cells[columnName].FormattedValue
+                :
+                    from DataGridViewRow r in grid.Rows
+                    where r.IsNewRow == false
+                    select r.Cells[columnName].Value;
 
-            return vals;
+            return vals.Distinct();
         }
 
-        #region Show Methods
-
-        public void Show(Control control, int x, int y, IEnumerable<DataGridViewCell> vals)
+        public void Show(Control control, int x, int y, IEnumerable<object> vals)
         {
-            RefreshFilterMenu(vals);
-            if (this.activeFilterType == ADGVFilterMenuFilterType.Custom)
-                SetNodesCheckedState(this.CheckList.Nodes, false);
-            DuplicateNodes();
+            this.LoadNodes(this.CreateNodesList(vals));
+            this.Show(control, x, y, false);
+        }
+
+        public void Show(Control control, int x, int y, bool restoreFilter)
+        {
+            this.checkListChanged = false;
+            
+            if (restoreFilter)
+                this.LoadNodes(this.filterNodes);
+
+            this.startingNodes = this.CloneNodes(this.CheckList.Nodes);
             base.Show(control, x, y);
         }
 
-        public void Show(Control control, int x, int y, Boolean RestoreFilter)
+        public void ClearSorting(bool fireEvent = false)
         {
-            if (RestoreFilter)
-                RestoreFilterNodes();
-            DuplicateNodes();
-            base.Show(control, x, y);
+            this.SetSorting(ADGVSortType.None, fireEvent);
         }
 
-        private void RefreshFilterMenu(IEnumerable<DataGridViewCell> vals)
+        public void SetSorting(ADGVSortType sort, bool fireEvent = false)
+        {
+            string oldSort = this.SortString;
+            this.SetSortingUI(sort);
+
+            if (fireEvent && oldSort != this.SortString)
+                this.SortChanged(this, new EventArgs());
+        }
+
+        public void ClearFilter(bool fireEvent = false)
+        {
+            for (int i = 2; i < FiltersMenuItem.DropDownItems.Count - 1; i++)
+            {
+                (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
+            }
+            this.ActiveFilterType = ADGVFilterType.None;
+
+            this.SetNodesCheckedState(this.CheckList.Nodes, true);
+
+            string oldFilter = this.FilterString;
+            this.FilterString = null;
+            this.filterNodes = null;
+            this.FiltersMenuItem.Checked = false;
+            this.okButton.Enabled = true;
+
+            if (fireEvent && oldFilter != this.FilterString)
+                this.FilterChanged(this, new EventArgs());
+        }
+
+        public void SetCustomFilter(string filter, string filterDisplayName = null, bool fireEvent = false)
+        {
+            if (!String.IsNullOrWhiteSpace(filter))
+            {
+                if (String.IsNullOrWhiteSpace(filterDisplayName))
+                    filterDisplayName = filter.Length > 30 ? filter.Remove(29) + "..." : filter;
+
+                int filtersMenuItemIndex = -1;
+
+                for (int i = 2; i < this.FiltersMenuItem.DropDownItems.Count - 1; i++)
+                    if (filter == this.FiltersMenuItem.DropDownItems[2].Tag.ToString())
+                    {
+                        filtersMenuItemIndex = i;
+                        break;
+                    }
+
+                if (filtersMenuItemIndex == -1)
+                {
+                    filtersMenuItemIndex = 2;
+                    this.FiltersMenuItem.DropDownItems[2].Tag = filter;
+                }
+
+                this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text = filterDisplayName;
+
+                this.SelectCustomFilter(filtersMenuItemIndex, fireEvent);
+            }
+        }
+
+        public void SaveCurrentFilter()
+        {
+            this.SetCustomFilter(this.filterString);
+        }
+
+        #endregion Public Methods
+
+        private void LoadNodes(IEnumerable<TripleTreeNode> nodes)
         {
             this.CheckList.BeginUpdate();
+
+            this.allsNode = null;
+            this.emptysNode = null;
+
             this.CheckList.Nodes.Clear();
 
-            if (vals != null)
+            if (nodes != null && nodes.Count() > 0)
             {
-                TripleTreeNode allnode = TripleTreeNode.CreateAllsNode(this.RM.GetString("tripletreenode_allnode_text") + "            ");
-                allnode.NodeFont = new Font(this.CheckList.Font, FontStyle.Bold);
-                this.CheckList.Nodes.Add(allnode);
+                this.CheckList.Nodes.AddRange(nodes.ToArray());
 
-                if (vals.Count() > 0)
+                for (int i = Math.Min(3, this.CheckList.Nodes.Count); i > 0; i--)
                 {
-                    var nonulls = vals.Where<DataGridViewCell>(c => c.Value != null && c.Value != DBNull.Value);
+                    var n = this.CheckList.Nodes[i - 1] as TripleTreeNode;
+                    if (n != null)
+                    {
+                        if (n.NodeType == TripleTreeNodeType.AllsNode)
+                            this.allsNode = n;
+                        else
+                            if (n.NodeType == TripleTreeNodeType.EmptysNode)
+                                this.emptysNode = n;
+                    }
+                }
+            }
 
-                    if (vals.Count() != nonulls.Count())
+            this.CheckList.EndUpdate();
+        }
+
+        private string DateTimeToNodeText(DateTime date, ADGVFilterMenuDateTimeGrouping grouping, bool showTime)
+        {
+            if (showTime)
+            {
+                switch (grouping)
+                {
+                    case ADGVFilterMenuDateTimeGrouping.Month:
+                        return string.Format("{0:D2} {1:D2}:{2:D2}:{3:D2}.{4}", date.Day, date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
+                    case ADGVFilterMenuDateTimeGrouping.Day:
+                        return string.Format("{0:D2}:{1:D2}:{2:D2}.{3}", date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
+                    case ADGVFilterMenuDateTimeGrouping.Hour:
+                        return string.Format("{0:D2}:{1:D2}.{2}", date.Minute, date.Second, date.Millisecond.ToString("D3"));
+                    case ADGVFilterMenuDateTimeGrouping.Minute:
+                        return string.Format("{0:D2}.{1}", date.Second, date.Millisecond.ToString("D3"));
+                    default:
+                        return string.Format("{0} {1:D2}:{2:D2}:{3:D2}.{4}", date.ToShortDateString(), date.Hour, date.Minute, date.Second, date.Millisecond.ToString("D3"));
+                }
+            }
+            else
+            {
+                switch (grouping)
+                {
+                    case ADGVFilterMenuDateTimeGrouping.None:
+                    case ADGVFilterMenuDateTimeGrouping.Year:
+                        return date.ToShortDateString();
+                    case ADGVFilterMenuDateTimeGrouping.Month:
+                        return date.Day.ToString("D2");
+                    default:
+                        return "--:--";
+                }
+
+            }
+        }
+
+        private IEnumerable<TripleTreeNode> CreateNodesList(IEnumerable<object> values)
+        {
+            List<TripleTreeNode> nodes = new List<TripleTreeNode>();
+
+            if (values != null)
+            {
+                var valsCnt = values.Count();
+
+                if (valsCnt > 0)
+                {
+                    TripleTreeNode allnode = TripleTreeNode.CreateAllsNode(this.RM.GetString("tripletreenode_allnode_text") + "            ");
+                    allnode.NodeFont = new Font(this.CheckList.Font, FontStyle.Bold);
+                    nodes.Add(allnode);
+
+                    values = values.Where(v => v != null && v != DBNull.Value);
+                    var nonullsCnt = values.Count();
+
+                    if (valsCnt > nonullsCnt)
                     {
                         TripleTreeNode nullnode = TripleTreeNode.CreateEmptysNode(this.RM.GetString("tripletreenode_nullnode_text") + "               ");
                         nullnode.NodeFont = new Font(this.CheckList.Font, FontStyle.Bold);
-                        this.CheckList.Nodes.Add(nullnode);
+                        nodes.Add(nullnode);
                     }
 
-                    #region Datetime
-
-                    if (this.DataType == typeof(DateTime))
+                    if (nonullsCnt > 0)
                     {
-                        var years =
-                            from year in nonulls
-                            group year by ((DateTime)year.Value).Year into y
-                            orderby y.Key ascending
-                            select y;
-
-                        foreach (var y in years)
+                        if (this.DataType == ADGVFilterMenuDataType.DateTime)
                         {
-                            TripleTreeNode yearnode = TripleTreeNode.CreateYearNode(y.Key.ToString(), y.Key);
-                            this.CheckList.Nodes.Add(yearnode);
+                            #region Datetime
 
-                            var months =
-                                from month in y
-                                group month by ((DateTime)month.Value).Month into m
-                                orderby m.Key ascending
-                                select m;
+                            bool hasTime = values.OfType<DateTime>().Any(d => d.Hour > 0 || d.Minute > 0 || d.Second > 0 || d.Millisecond > 0);
 
-                            foreach (var m in months)
+                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.None)
                             {
-                                TripleTreeNode monthnode = yearnode.CreateChildNode(this.months[m.Key], m.Key);
+                                foreach (var d in values.OfType<DateTime>().OrderBy(d => d))
+                                    nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
+                            }
+                            else
+                            {
+                                var years =
+                                from year in values.OfType<DateTime>().OrderBy(d => d)
+                                group year by year.Year into y
+                                select y;
 
-                                var days =
-                                    from day in m
-                                    group day by ((DateTime)day.Value).Day into d
-                                    orderby d.Key ascending
-                                    select d;
-
-                                foreach (var d in days)
+                                foreach (var y in years)
                                 {
-                                    TripleTreeNode daysnode;
+                                    var yearnode = TripleTreeNode.CreateYearNode(y.Key.ToString(), y.Key);
+                                    nodes.Add(yearnode);
 
-                                    if (!this.TimeFilter)
-                                        daysnode = monthnode.CreateChildNode(d.Key.ToString("D2"), d.First().Value);
+                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Year)
+                                    {
+                                        foreach (var d in y)
+                                            yearnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
+                                    }
                                     else
                                     {
-                                        if (!this.DateWithTime)
-                                        {
-                                            daysnode = monthnode.CreateChildNode(d.Key.ToString("D2"), d.First().Value);
-                                            TripleTreeNode hoursnode = daysnode.CreateChildNode("## " + this.RM.GetString("checknodetree_hour"), null);
-                                            TripleTreeNode minsnode = hoursnode.CreateChildNode("## " + this.RM.GetString("checknodetree_minute"), null);
-                                            TripleTreeNode secsnode = minsnode.CreateChildNode("## " + this.RM.GetString("checknodetree_second"), null);
-                                            TripleTreeNode msecsnode = secsnode.CreateChildNode("### " + this.RM.GetString("checknodetree_millisecond"), null);
-                                        }
-                                        else
-                                        {
-                                            daysnode = monthnode.CreateChildNode(d.Key.ToString("D2"), d.Key);
+                                        var months =
+                                            from month in y
+                                            group month by month.Month into m
+                                            select m;
 
-                                            var hours =
-                                                from hour in d
-                                                group hour by ((DateTime)hour.Value).Hour into h
-                                                orderby h.Key ascending
-                                                select h;
+                                        foreach (var m in months)
+                                        {
+                                            var monthnode = yearnode.CreateChildNode(this.months[m.Key], m.Key);
 
-                                            foreach (var h in hours)
+                                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Month || !hasTime)
                                             {
-                                                TripleTreeNode hoursnode = daysnode.CreateChildNode(h.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_hour"), h.Key);
+                                                foreach (var d in m)
+                                                    monthnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(d, this.dateTimeGrouping, hasTime), d));
+                                            }
+                                            else
+                                            {
+                                                var days =
+                                                    from day in m
+                                                    group day by day.Day into d
+                                                    select d;
 
-                                                var mins =
-                                                    from min in h
-                                                    group min by ((DateTime)min.Value).Minute into mn
-                                                    orderby mn.Key ascending
-                                                    select mn;
-
-                                                foreach (var mn in mins)
+                                                foreach (var d in days)
                                                 {
-                                                    TripleTreeNode minsnode = hoursnode.CreateChildNode(mn.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_minute"), mn.Key);
+                                                    var daysnode = monthnode.CreateChildNode(d.Key.ToString("D2"), d.Key);
 
-                                                    var secs =
-                                                        from sec in mn
-                                                        group sec by ((DateTime)sec.Value).Second into s
-                                                        orderby s.Key ascending
-                                                        select s;
-
-                                                    foreach (var s in secs)
+                                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Day)
                                                     {
-                                                        TripleTreeNode secsnode = minsnode.CreateChildNode(s.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_second"), s.Key);
+                                                        foreach (var t in d)
+                                                            daysnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
+                                                    }
+                                                    else
+                                                    {
+                                                        var hours =
+                                                            from hour in d
+                                                            group hour by hour.Hour into h
+                                                            select h;
 
-                                                        var msecs =
-                                                            from msec in s
-                                                            group msec by ((DateTime)msec.Value).Millisecond into ms
-                                                            orderby ms.Key ascending
-                                                            select ms;
-
-                                                        foreach (var ms in msecs)
+                                                        foreach (var h in hours)
                                                         {
-                                                            TripleTreeNode msecsnode = secsnode.CreateChildNode(ms.Key.ToString("D3") + " " + this.RM.GetString("checknodetree_millisecond"), ms.First().Value);
+                                                            var hoursnode = daysnode.CreateChildNode(h.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_hour"), h.Key);
+
+                                                            if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Hour)
+                                                            {
+                                                                foreach (var t in h)
+                                                                    hoursnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
+                                                            }
+                                                            else
+                                                            {
+                                                                var mins =
+                                                                    from min in h
+                                                                    group min by min.Minute into mn
+                                                                    select mn;
+
+                                                                foreach (var mn in mins)
+                                                                {
+                                                                    var minsnode = hoursnode.CreateChildNode(mn.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_minute"), mn.Key);
+
+                                                                    if (this.dateTimeGrouping == ADGVFilterMenuDateTimeGrouping.Minute)
+                                                                    {
+                                                                        foreach (var t in mn)
+                                                                            minsnode.Nodes.Add(TripleTreeNode.CreateMSecNode(DateTimeToNodeText(t, this.dateTimeGrouping, true), t));
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        var secs =
+                                                                            from sec in mn
+                                                                            group sec by sec.Second into s
+                                                                            select s;
+
+                                                                        foreach (var s in secs)
+                                                                        {
+                                                                            var secsnode = minsnode.CreateChildNode(s.Key.ToString("D2") + " " + this.RM.GetString("checknodetree_second"), s.Key);
+
+                                                                            var msecs =
+                                                                                from msec in s
+                                                                                group msec by msec.Millisecond into ms
+                                                                                select ms;
+
+                                                                            foreach (var ms in msecs)
+                                                                                secsnode.CreateChildNode(ms.Key.ToString("D3") + " " + this.RM.GetString("checknodetree_millisecond"), ms.First());
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -643,128 +906,108 @@ namespace ADGV
                                     }
                                 }
                             }
+                            #endregion Datetime
+                        }
+                        else if (this.DataType == ADGVFilterMenuDataType.Boolean)
+                        {
+                            if (nonullsCnt > 1)
+                            {
+                                nodes.Add(TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_false"), false));
+                                nodes.Add(TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_true"), true));
+                            }
+                            else if ((Boolean)values.First())
+                            {
+                                nodes.Add(TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_true"), true));
+                            }
+                            else
+                                nodes.Add(TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_false"), false));
+                        }
+                        else
+                        {
+                            foreach (var v in values.OrderBy(o => o))
+                                nodes.Add(TripleTreeNode.CreateNode(v.ToString(), v));
                         }
                     }
+                }
+            }
 
-                    #endregion Datetime
+            return nodes;
+        }
 
-                    #region Boolean
+        private IEnumerable<TripleTreeNode> RecreateDateTimeNodes(IEnumerable<TripleTreeNode> nodes)
+        {
+            var oldNodes = nodes.SelectMany(n => n.AllNodes).Where(n => n.NodeType == TripleTreeNodeType.MSecDateTimeNode || n.NodeType == TripleTreeNodeType.EmptysNode || n.NodeType == TripleTreeNodeType.AllsNode).ToList();
+            var newNodes = this.CreateNodesList(oldNodes.Where(n => n.NodeType != TripleTreeNodeType.AllsNode).Select(n => n.Value));
 
-                    else if (this.DataType == typeof(Boolean))
+            if (newNodes.Count() > 0)
+            {
+                oldNodes = oldNodes.Where(n => n.CheckState == CheckState.Checked).ToList();
+                if (oldNodes.Count() > 0)
+                {
+                    if (oldNodes.Any(n => n.NodeType == TripleTreeNodeType.AllsNode))
                     {
-                        var values = nonulls.Where<DataGridViewCell>(c => (Boolean)c.Value == true);
-
-                        if (values.Count() != nonulls.Count())
-                        {
-                            TripleTreeNode node = TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_false"), false);
-                            this.CheckList.Nodes.Add(node);
-                        }
-
-                        if (values.Count() > 0)
-                        {
-                            TripleTreeNode node = TripleTreeNode.CreateNode(this.RM.GetString("tripletreenode_boolean_true"), true);
-                            this.CheckList.Nodes.Add(node);
-                        }
+                        this.SetNodesCheckedState(newNodes, true);
                     }
-
-                    #endregion Boolean
-
-                    #region String
-
                     else
                     {
-                        foreach (var v in nonulls.GroupBy(c => c.Value).OrderBy(g => g.Key))
+                        foreach (var node in newNodes.SelectMany(n => n.AllNodes).Where(n => n.NodeType == TripleTreeNodeType.MSecDateTimeNode || n.NodeType == TripleTreeNodeType.EmptysNode))
                         {
-                            TripleTreeNode node = TripleTreeNode.CreateNode(v.First().FormattedValue.ToString(), v.Key);
-                            this.CheckList.Nodes.Add(node);
+                            if (oldNodes.Any(n => n.Value.Equals(node.Value)))
+                            {
+                                node.CheckState = CheckState.Checked;
+                                oldNodes.RemoveAll(n => n.Value.Equals(node.Value));
+                            }
+                            else
+                                node.CheckState = CheckState.Unchecked;
                         }
+
+                        var allsNode = newNodes.FirstOrDefault(n => n.NodeType == TripleTreeNodeType.AllsNode);
+                        if (allsNode != null)
+                            allsNode.CheckState = this.UpdateNodesCheckState(newNodes);
                     }
-
-                    #endregion String
                 }
+                return newNodes;
             }
-
-            this.CheckList.EndUpdate();
+            else
+                return null;
         }
 
-        #endregion Show Methods
-
-        #region CheckList
-
-        private void DuplicateNodes()
+        private IEnumerable<TripleTreeNode> CloneNodes(IEnumerable<TripleTreeNode> nodes)
         {
-            this.startingNodes = new TripleTreeNode[this.CheckList.Nodes.Count];
-            Int32 i = 0;
-            foreach (TripleTreeNode n in this.CheckList.Nodes)
+            if (nodes != null && nodes.Count() > 0)
             {
-                this.startingNodes[i] = n.Clone();
-                i++;
+                var result = new TripleTreeNode[nodes.Count()];
+                foreach (TripleTreeNode n in nodes)
+                    result[n.Index] = n.Clone();
+
+                return result;
             }
+            else
+                return null;
         }
 
-        private void DuplicateFilterNodes()
+        private IEnumerable<TripleTreeNode> CloneNodes(TreeNodeCollection nodes)
         {
-            this.filterNodes = new TripleTreeNode[this.CheckList.Nodes.Count];
-            int i = 0;
-            foreach (TripleTreeNode n in this.CheckList.Nodes)
+            if (nodes != null && nodes.Count > 0)
             {
-                this.filterNodes[i] = n.Clone();
-                i++;
+                var result = new TripleTreeNode[nodes.Count];
+                foreach (TripleTreeNode n in nodes)
+                    result[n.Index] = n.Clone();
+
+                return result;
             }
+            else
+                return null;
         }
 
-        private void RestoreNodes()
+        private void SetNodesCheckedState(IEnumerable<TripleTreeNode> nodes, Boolean isChecked)
         {
-            this.CheckList.Nodes.Clear();
-            if (startingNodes != null)
-                this.CheckList.Nodes.AddRange(this.startingNodes);
-        }
-
-        private void RestoreFilterNodes()
-        {
-            this.CheckList.Nodes.Clear();
-            if (filterNodes != null)
-                this.CheckList.Nodes.AddRange(this.filterNodes);
-        }
-
-        private TripleTreeNode GetAllsNode()
-        {
-            TripleTreeNode result = null;
-            Int32 i = 0;
-            foreach (TripleTreeNode n in this.CheckList.Nodes)
+            foreach (TripleTreeNode node in nodes)
             {
-                if (n.NodeType == TripleTreeNodeType.AllsNode)
-                {
-                    result = n;
-                    break;
-                }
-                else if (i > 2)
-                    break;
-                else
-                    i++;
+                node.Checked = isChecked;
+                if (node.Nodes.Count > 0)
+                    this.SetNodesCheckedState(node.Nodes, isChecked);
             }
-
-            return result;
-        }
-
-        private TripleTreeNode GetNullNode()
-        {
-            TripleTreeNode result = null;
-            Int32 i = 0;
-            foreach (TripleTreeNode n in this.CheckList.Nodes)
-            {
-                if (n.NodeType == TripleTreeNodeType.EmptysNode)
-                {
-                    result = n;
-                    break;
-                }
-                else if (i > 2)
-                    break;
-                else
-                    i++;
-            }
-
-            return result;
         }
 
         private void SetNodesCheckedState(TreeNodeCollection nodes, Boolean isChecked)
@@ -772,16 +1015,14 @@ namespace ADGV
             foreach (TripleTreeNode node in nodes)
             {
                 node.Checked = isChecked;
-                if (node.Nodes != null && node.Nodes.Count > 0)
-                    SetNodesCheckedState(node.Nodes, isChecked);
+                if (node.Nodes.Count > 0)
+                    this.SetNodesCheckedState(node.Nodes, isChecked);
             }
         }
 
-        private CheckState UpdateNodesCheckState(TreeNodeCollection nodes)
+        private CheckState UpdateNodesCheckState(IEnumerable<TripleTreeNode> nodes)
         {
-            CheckState result = CheckState.Unchecked;
-            Boolean isFirstNode = true;
-            Boolean isAllNodesSomeCheckState = true;
+            CheckState? result = null;
 
             foreach (TripleTreeNode n in nodes)
             {
@@ -789,48 +1030,45 @@ namespace ADGV
                     continue;
 
                 if (n.Nodes.Count > 0)
-                {
                     n.CheckState = UpdateNodesCheckState(n.Nodes);
-                }
 
-                if (isFirstNode)
+                if (result.HasValue)
                 {
-                    result = n.CheckState;
-                    isFirstNode = false;
+                    if (result.Value != n.CheckState)
+                        result = CheckState.Indeterminate;
                 }
                 else
-                    if (result != n.CheckState)
-                        isAllNodesSomeCheckState = false;
+                    result = n.CheckState;
             }
 
-            if (isAllNodesSomeCheckState)
-                return result;
-            else
-                return CheckState.Indeterminate;
+            return result.HasValue ? result.Value : CheckState.Unchecked;
         }
 
-        private void RefreshNodesState()
+        private CheckState UpdateNodesCheckState(TreeNodeCollection nodes)
         {
-            CheckState state = UpdateNodesCheckState(this.CheckList.Nodes);
+            CheckState? result = null;
 
-            GetAllsNode().CheckState = state;
-            this.okButton.Enabled = !(state == CheckState.Unchecked);
+            foreach (TripleTreeNode n in nodes)
+            {
+                if (n.NodeType == TripleTreeNodeType.AllsNode)
+                    continue;
+
+                if (n.Nodes.Count > 0)
+                    n.CheckState = UpdateNodesCheckState(n.Nodes);
+
+                if (result.HasValue)
+                {
+                    if (result.Value != n.CheckState)
+                        result = CheckState.Indeterminate;
+                }
+                else
+                    result = n.CheckState;
+            }
+
+            return result.HasValue ? result.Value : CheckState.Unchecked;
         }
 
-        private void CheckList_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
-        {
-            TreeViewHitTestInfo HitTestInfo = this.CheckList.HitTest(e.X, e.Y);
-            if (HitTestInfo != null && HitTestInfo.Location == TreeViewHitTestLocations.StateImage)
-                NodeCheckChange(e.Node as TripleTreeNode);
-        }
-
-        private void CheckList_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Space)
-                NodeCheckChange(this.CheckList.SelectedNode as TripleTreeNode);
-        }
-
-        private void NodeCheckChange(TripleTreeNode node)
+        private void ChangeNodeCheck(TripleTreeNode node)
         {
             if (node.CheckState == CheckState.Checked)
                 node.CheckState = CheckState.Unchecked;
@@ -839,280 +1077,89 @@ namespace ADGV
 
             if (node.NodeType == TripleTreeNodeType.AllsNode)
             {
-                SetNodesCheckedState(this.CheckList.Nodes, node.Checked);
+                this.SetNodesCheckedState(this.CheckList.Nodes, node.Checked);
                 this.okButton.Enabled = node.Checked;
             }
             else
             {
                 if (node.Nodes.Count > 0)
                 {
-                    SetNodesCheckedState(node.Nodes, node.Checked);
+                    this.SetNodesCheckedState(node.Nodes, node.Checked);
                 }
 
-                RefreshNodesState();
+                CheckState state = this.UpdateNodesCheckState(this.CheckList.Nodes);
+
+                if (this.allsNode != null)
+                    this.allsNode.CheckState = state;
+
+                this.okButton.Enabled = !(state == CheckState.Unchecked);
             }
         }
 
-        private String CreateFilterString(IEnumerable<TripleTreeNode> nodes)
+        private string CreateFilterString()
         {
             StringBuilder sb = new StringBuilder("");
-            String appx = this.DataType == typeof(DateTime) && !this.TimeFilter && this.DateWithTime ? " OR " : ", ";
 
-            if (nodes != null && nodes.Count() > 0)
+            var nodes = this.CheckList.Nodes.AsParallel().Cast<TripleTreeNode>()
+                    .Where(n => n.NodeType != TripleTreeNodeType.AllsNode
+                           && n.NodeType != TripleTreeNodeType.EmptysNode
+                           && n.CheckState != CheckState.Unchecked);
+
+            if (nodes.Count() > 0)
             {
-                if (this.DataType == typeof(DateTime))
+                if (this.DataType == ADGVFilterMenuDataType.Boolean)
                 {
-                    foreach (TripleTreeNode n in nodes)
-                    {
-                        if (n.Checked && (
-                                (n.NodeType == TripleTreeNodeType.DayDateTimeNode && (!this.TimeFilter || !this.DateWithTime)) ||
-                                (n.NodeType == TripleTreeNodeType.MSecDateTimeNode && this.TimeFilter && this.DateWithTime)
-                            ))
-                        {
-                            if (this.TimeFilter && this.DateWithTime)
-                                sb.Append("'" + ((DateTime)n.Value).ToString("o") + "'" + appx);
-                            else if (!this.TimeFilter && this.DateWithTime)
-                                sb.Append("(Convert([{0}], System.String) LIKE '" + ((DateTime)n.Value).ToShortDateString() + "%')" + appx);
-                            else
-                                sb.Append("'" + ((DateTime)n.Value).ToShortDateString() + "'" + appx);
-                        }
-                        else if (n.CheckState != CheckState.Unchecked && n.Nodes.Count > 0)
-                        {
-                            String subnode = CreateFilterString(n.Nodes.AsParallel().Cast<TripleTreeNode>().Where(sn => sn.CheckState != CheckState.Unchecked));
-                            if (subnode.Length > 0)
-                                sb.Append(subnode + appx);
-                        }
-                    }
-                }
-                else if (this.DataType == typeof(Boolean))
-                {
-                    foreach (TripleTreeNode n in nodes)
-                    {
-                        sb.Append(n.Value.ToString());
-                        break;
-                    }
-                }
-                else if (this.DataType == typeof(Int32) || this.DataType == typeof(Int64) || this.DataType == typeof(Int16) ||
-                    this.DataType == typeof(UInt32) || this.DataType == typeof(UInt64) || this.DataType == typeof(UInt16) ||
-                    this.DataType == typeof(Byte) || this.DataType == typeof(SByte))
-                {
-                    foreach (TripleTreeNode n in nodes)
-                        sb.Append(n.Value.ToString() + appx);
-                }
-                else if (this.DataType == typeof(Single) || this.DataType == typeof(Double) || this.DataType == typeof(Decimal))
-                {
-                    foreach (TripleTreeNode n in nodes)
-                        sb.Append(n.Value.ToString().Replace(",", ".") + appx);
+                    if (nodes.Count() == 1)
+                        sb.Append(nodes.First().Value.ToString());
                 }
                 else
                 {
-                    foreach (TripleTreeNode n in nodes)
-                        sb.Append("'" + this.FormatString(n.Value.ToString()) + "'" + appx);
+                    if (this.DataType == ADGVFilterMenuDataType.DateTime)
+                    {
+                        foreach (var d in nodes.SelectMany(n => n.AllNodes)
+                            .Where(cn => cn.CheckState == CheckState.Checked && cn.NodeType == TripleTreeNodeType.MSecDateTimeNode)
+                            .Select(n => n.Value).Cast<DateTime>())
+                        {
+                            sb.Append("'" + d.ToString("o") + "', ");
+                        }
+                    }
+                    else if (this.DataType == ADGVFilterMenuDataType.Int)
+                    {
+                        foreach (var n in nodes)
+                            sb.Append(n.Value.ToString() + ", ");
+                    }
+                    else if (this.DataType == ADGVFilterMenuDataType.Float)
+                    {
+                        foreach (var n in nodes)
+                            sb.Append(n.Value.ToString().Replace(",", ".") + ", ");
+                    }
+                    else foreach (var n in nodes)
+                        {
+                            sb.Append("'" + n.Value.ToString().Replace("'", "''").Replace("{", "{{").Replace("}", "}}") + "', ");
+                        }
+
+                    sb.Length -= 2;
                 }
             }
-
-            if (sb.Length > appx.Length && this.DataType != typeof(Boolean))
-                sb.Remove(sb.Length - appx.Length, appx.Length);
 
             return sb.ToString();
         }
 
-        private String FormatString(String Text)
+        private void SelectCustomFilter(int filtersMenuItemIndex, bool fireEvent = true)
         {
-            String result = "";
-            String s;
-            String[] replace = { "%", "[", "]", "*", "\"", "`", "\\" };
+            String newFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Tag.ToString();
+            String newViewFilterString = this.FiltersMenuItem.DropDownItems[filtersMenuItemIndex].Text;
 
-            for (Int32 i = 0; i < Text.Length; i++)
+            if (filtersMenuItemIndex != 2)
             {
-                s = Text[i].ToString();
-                if (replace.Contains(s))
-                    result += "[" + s + "]";
-                else
-                    result += s;
-            }
-
-            return result.Replace("'", "''");
-        }
-
-        private void okButton_Click(object sender, EventArgs e)
-        {
-            TripleTreeNode NullorALLNode = GetAllsNode();
-            this.FiltersMenuItem.Checked = false;
-
-            if (NullorALLNode != null && NullorALLNode.Checked)
-                CancelFilterMenuItem_Click(null, new EventArgs());
-            else
-            {
-                String oldfilter = this.FilterString;
-                this.FilterString = "";
-                this.activeFilterType = ADGVFilterMenuFilterType.CheckList;
-
-                if (this.CheckList.Nodes.Count > 1)
+                for (int i = filtersMenuItemIndex; i > 2; i--)
                 {
-                    NullorALLNode = GetNullNode();
-                    if (NullorALLNode != null && NullorALLNode.Checked)
-                        this.FilterString = "[{0}] IS NULL";
-
-                    if (this.CheckList.Nodes.Count > 2 || NullorALLNode == null)
-                    {
-                        String filter = CreateFilterString(
-                            this.CheckList.Nodes.AsParallel().Cast<TripleTreeNode>().Where(
-                                n => n.NodeType != TripleTreeNodeType.AllsNode
-                                    && n.NodeType != TripleTreeNodeType.EmptysNode
-                                    && n.CheckState != CheckState.Unchecked
-                            )
-                        );
-
-                        if (filter.Length > 0)
-                        {
-                            if (this.FilterString.Length > 0)
-                                this.FilterString += " OR ";
-
-                            if (this.DataType == typeof(DateTime))
-                            {
-                                if (!this.TimeFilter && this.DateWithTime)
-                                    this.FilterString += filter;
-                                else
-                                    this.FilterString += "[{0}] IN (" + filter + ")";
-                            }
-                            else if (this.DataType == typeof(Boolean))
-                                this.FilterString += "{0}=" + filter;
-                            else if (this.DataType == typeof(Int32) || this.DataType == typeof(Int64) || this.DataType == typeof(Int16) ||
-                                        this.DataType == typeof(UInt32) || this.DataType == typeof(UInt64) || this.DataType == typeof(UInt16) ||
-                                        this.DataType == typeof(Byte) || this.DataType == typeof(SByte) || this.DataType == typeof(String))
-                                this.FilterString += "[{0}] IN (" + filter + ")";
-                            else
-                                this.FilterString += "Convert([{0}],System.String) IN (" + filter + ")";
-                        }
-                    }
+                    this.FiltersMenuItem.DropDownItems[i].Text = this.FiltersMenuItem.DropDownItems[i - 1].Text;
+                    this.FiltersMenuItem.DropDownItems[i].Tag = this.FiltersMenuItem.DropDownItems[i - 1].Tag;
                 }
 
-                DuplicateFilterNodes();
-
-                if (oldfilter != this.FilterString && this.FilterChanged != null)
-                    FilterChanged(this, new EventArgs());
-            }
-            this.Close();
-        }
-
-        private void cancelButton_Click(object sender, EventArgs e)
-        {
-            RestoreNodes();
-            this.Close();
-        }
-
-        #endregion CheckList
-
-        #region Sort Menus
-
-        private void SortASCMenuItem_Click(object sender, EventArgs e)
-        {
-            SortASCMenuItem.Checked = true;
-            SortDESCMenuItem.Checked = false;
-            this.activeSortType = ADGVFilterMenuSortType.ASC;
-            String oldsort = this.SortString;
-            this.SortString = "[{0}] ASC";
-
-            if (oldsort != this.SortString && this.SortChanged != null)
-                SortChanged(this, new EventArgs());
-        }
-
-        private void SortDESCMenuItem_Click(object sender, EventArgs e)
-        {
-            SortASCMenuItem.Checked = false;
-            SortDESCMenuItem.Checked = true;
-            this.activeSortType = ADGVFilterMenuSortType.DESC;
-            String oldsort = this.SortString;
-            this.SortString = "[{0}] DESC";
-
-            if (oldsort != this.SortString && this.SortChanged != null)
-                SortChanged(this, new EventArgs());
-        }
-
-        private void CancelSortMenuItem_Click(object sender, EventArgs e)
-        {
-            String oldsort = this.SortString;
-            ClearSorting();
-            if (oldsort != this.SortString && this.SortChanged != null)
-                SortChanged(this, new EventArgs());
-        }
-
-        public void ClearSorting()
-        {
-            String oldsort = this.SortString;
-            this.SortASCMenuItem.Checked = false;
-            this.SortDESCMenuItem.Checked = false;
-            this.activeSortType = ADGVFilterMenuSortType.None;
-            this.SortString = null;
-        }
-
-        #endregion Sort Menus
-
-        #region Filter Menu
-
-        private void SetupFilterMenuItem_Click(object sender, EventArgs e)
-        {
-            SetFilterForm flt = new SetFilterForm(this.DataType, this.DateWithTime, this.TimeFilter);
-            if (flt.ShowDialog() == DialogResult.OK)
-                AddCustomFilter(flt.FilterString, flt.ViewFilterString);
-        }
-
-        private void AddCustomFilter(String FilterString, String ViewFilterString)
-        {
-            Int32 index = -1;
-
-            for (Int32 i = 2; i < FiltersMenuItem.DropDownItems.Count; i++)
-            {
-                if (FiltersMenuItem.DropDown.Items[i].Available)
-                {
-                    if (FiltersMenuItem.DropDownItems[i].Text == ViewFilterString && FiltersMenuItem.DropDownItems[i].Tag.ToString() == FilterString)
-                    {
-                        index = i;
-                        break;
-                    }
-                }
-                else
-                    break;
-            }
-
-            if (index < 2)
-            {
-                for (Int32 i = FiltersMenuItem.DropDownItems.Count - 2; i > 1; i--)
-                {
-                    if (FiltersMenuItem.DropDownItems[i].Available)
-                    {
-                        FiltersMenuItem.DropDownItems[i + 1].Text = FiltersMenuItem.DropDownItems[i].Text;
-                        FiltersMenuItem.DropDownItems[i + 1].Tag = FiltersMenuItem.DropDownItems[i].Tag;
-                    }
-                }
-                index = 2;
-
-                FiltersMenuItem.DropDownItems[2].Text = ViewFilterString;
-                FiltersMenuItem.DropDownItems[2].Tag = FilterString;
-            }
-
-            SetCustomFilter(index);
-        }
-
-        private void SetCustomFilter(int FiltersMenuItemIndex)
-        {
-            if (this.activeFilterType == ADGVFilterMenuFilterType.CheckList)
-                SetNodesCheckedState(this.CheckList.Nodes, false);
-
-            String filterstring = this.FiltersMenuItem.DropDownItems[FiltersMenuItemIndex].Tag.ToString();
-            String viewfilterstring = this.FiltersMenuItem.DropDownItems[FiltersMenuItemIndex].Text;
-
-            if (FiltersMenuItemIndex != 2)
-            {
-                for (int i = FiltersMenuItemIndex; i > 2; i--)
-                {
-                    FiltersMenuItem.DropDownItems[i].Text = FiltersMenuItem.DropDownItems[i - 1].Text;
-                    FiltersMenuItem.DropDownItems[i].Tag = FiltersMenuItem.DropDownItems[i - 1].Tag;
-                }
-
-                FiltersMenuItem.DropDownItems[2].Text = viewfilterstring;
-                FiltersMenuItem.DropDownItems[2].Tag = filterstring;
+                this.FiltersMenuItem.DropDownItems[2].Text = newViewFilterString;
+                this.FiltersMenuItem.DropDownItems[2].Tag = newFilterString;
             }
 
             for (int i = 3; i < FiltersMenuItem.DropDownItems.Count; i++)
@@ -1121,24 +1168,170 @@ namespace ADGV
             }
 
             (this.FiltersMenuItem.DropDownItems[2] as ToolStripMenuItem).Checked = true;
-            this.activeFilterType = ADGVFilterMenuFilterType.Custom;
-            String oldfilter = this.FilterString;
-            this.FilterString = filterstring;
-            SetNodesCheckedState(this.CheckList.Nodes, false);
-            DuplicateFilterNodes();
+
+            this.SetNodesCheckedState(this.CheckList.Nodes, false);
+            this.filterNodes = this.CloneNodes(this.CheckList.Nodes);
+            this.ActiveFilterType = ADGVFilterType.Custom;
             this.FiltersMenuItem.Checked = true;
             this.okButton.Enabled = false;
-            if (oldfilter != this.FilterString && this.FilterChanged != null)
-                FilterChanged(this, new EventArgs());
-        }
 
-        private void lastfilter1MenuItem_VisibleChanged(object sender, EventArgs e)
+            if (fireEvent && newFilterString != this.FilterString)
+            {
+                this.FilterString = newFilterString;    
+                this.FilterChanged(this, new EventArgs());
+            }
+        }
+      
+        private void SetSortingUI(ADGVSortType sort)
         {
-            toolStripSeparator2MenuItem.Visible = !lastfilter1MenuItem.Visible;
-            (sender as ToolStripMenuItem).VisibleChanged -= lastfilter1MenuItem_VisibleChanged;
+            this.ActiveSortType = sort;
+
+            switch (sort)
+            {
+                case ADGVSortType.ASC:
+                    this.SortASCMenuItem.Checked = true;
+                    this.SortDESCMenuItem.Checked = false;
+                    this.SortString = "[{0}] ASC";
+                    break;
+                case ADGVSortType.DESC:
+                    this.SortASCMenuItem.Checked = false;
+                    this.SortDESCMenuItem.Checked = true;
+                    this.SortString = "[{0}] DESC";
+                    break;
+                default:
+                    this.SortASCMenuItem.Checked = false;
+                    this.SortDESCMenuItem.Checked = false;
+                    this.SortString = null;
+                    break;
+            }
         }
 
-        private void lastfilter1MenuItem_Click(object sender, EventArgs e)
+        #region Interface Events
+
+        #region CheckList Interface Events
+        
+        private void CheckList_MouseLeave(object sender, EventArgs e)
+        {
+            this.Focus();
+        }
+
+        private void CheckList_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            TripleTreeNode n = e.Node as TripleTreeNode;
+            SetNodesCheckedState(this.CheckList.Nodes, false);
+            n.CheckState = CheckState.Unchecked;
+            ChangeNodeCheck(n);
+            this.okButton_Click(this, new EventArgs());
+        }
+
+        private void CheckList_MouseEnter(object sender, EventArgs e)
+        {
+            this.CheckList.Focus();
+        }
+
+        private void CheckList_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            TreeViewHitTestInfo HitTestInfo = this.CheckList.HitTest(e.X, e.Y);
+            if (HitTestInfo != null && HitTestInfo.Location == TreeViewHitTestLocations.StateImage)
+            {
+                ChangeNodeCheck(e.Node as TripleTreeNode);
+                this.checkListChanged = true;
+            }
+        }
+
+        private void CheckList_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Space)
+            {
+                ChangeNodeCheck(this.CheckList.SelectedNode as TripleTreeNode);
+                this.checkListChanged = true;
+            }
+        }
+
+        #endregion CheckList Interface Events
+
+        #region Sorting Interface events
+
+        private void SortASCMenuItem_Click(object sender, EventArgs e)
+        {
+            this.SetSortingUI(ADGVSortType.ASC);
+
+            if (this.checkListChanged)
+                this.LoadNodes(this.startingNodes);
+
+            this.SortChanged(this, new EventArgs());
+        }
+        
+        private void SortDESCMenuItem_Click(object sender, EventArgs e)
+        {
+            this.SetSortingUI(ADGVSortType.DESC);
+
+            if (this.checkListChanged)
+                this.LoadNodes(this.startingNodes);
+
+            this.SortChanged(this, new EventArgs());
+        }
+
+        private void CancelSortMenuItem_Click(object sender, EventArgs e)
+        {
+            if (this.checkListChanged)
+                this.LoadNodes(this.startingNodes);
+
+            this.ClearSorting(true);
+        }
+
+        #endregion Sorting Interface events
+
+        #region CustomFilter Interface events
+
+        private void SetupFilterMenuItem_Click(object sender, EventArgs e)
+        {
+            SetFilterForm flt = new SetFilterForm(this.DataType);
+            if (flt.ShowDialog() == DialogResult.OK)
+            {
+                Int32 index = -1;
+
+                for (Int32 i = 2; i < this.FiltersMenuItem.DropDownItems.Count; i++)
+                {
+                    if (this.FiltersMenuItem.DropDown.Items[i].Available)
+                    {
+                        if (this.FiltersMenuItem.DropDownItems[i].Text == flt.ViewFilterString && this.FiltersMenuItem.DropDownItems[i].Tag.ToString() == flt.FilterString)
+                        {
+                            index = i;
+                            break;
+                        }
+                    }
+                    else
+                        break;
+                }
+
+                if (index < 2)
+                {
+                    for (Int32 i = this.FiltersMenuItem.DropDownItems.Count - 2; i > 1; i--)
+                    {
+                        if (this.FiltersMenuItem.DropDownItems[i].Available)
+                        {
+                            this.FiltersMenuItem.DropDownItems[i + 1].Text = this.FiltersMenuItem.DropDownItems[i].Text;
+                            this.FiltersMenuItem.DropDownItems[i + 1].Tag = this.FiltersMenuItem.DropDownItems[i].Tag;
+                        }
+                    }
+                    index = 2;
+
+                    this.FiltersMenuItem.DropDownItems[2].Text = flt.ViewFilterString;
+                    this.FiltersMenuItem.DropDownItems[2].Tag = flt.FilterString;
+                }
+
+                this.SelectCustomFilter(index);
+            }
+        }
+
+        private void lastfilterMenuItem_VisibleChanged(object sender, EventArgs e)
+        {
+            this.toolStripSeparator2MenuItem.Visible = false;
+            this.lastfilter1MenuItem.VisibleChanged -= lastfilterMenuItem_VisibleChanged;
+        }
+
+        private void lastfilterMenuItem_Click(object sender, EventArgs e)
         {
             ToolStripMenuItem menuitem = sender as ToolStripMenuItem;
 
@@ -1146,46 +1339,21 @@ namespace ADGV
             {
                 if (FiltersMenuItem.DropDownItems[i].Text == menuitem.Text && FiltersMenuItem.DropDownItems[i].Tag.ToString() == menuitem.Tag.ToString())
                 {
-                    SetCustomFilter(i);
+                    this.SelectCustomFilter(i);
                     break;
                 }
             }
         }
 
-        private void lastfilter1MenuItem_TextChanged(object sender, EventArgs e)
+        private void lastfilterMenuItem_TextChanged(object sender, EventArgs e)
         {
             (sender as ToolStripMenuItem).Available = true;
-            (sender as ToolStripMenuItem).TextChanged -= lastfilter1MenuItem_TextChanged;
+            (sender as ToolStripMenuItem).TextChanged -= lastfilterMenuItem_TextChanged;
         }
 
-        private void CancelFilterMenuItem_Click(object sender, EventArgs e)
-        {
-            String oldfilter = this.FilterString;
-            this.ClearFilter();
-            if (oldfilter != this.FilterString && this.FilterChanged != null)
-                FilterChanged(this, new EventArgs());
-        }
+        #endregion CustomFilter Interface events
 
-        public void ClearFilter()
-        {
-            for (int i = 2; i < FiltersMenuItem.DropDownItems.Count - 1; i++)
-            {
-                (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
-            }
-            this.activeFilterType = ADGVFilterMenuFilterType.None;
-            SetNodesCheckedState(this.CheckList.Nodes, true);
-            String oldsort = this.FilterString;
-            this.FilterString = null;
-            this.filterNodes = null;
-            this.FiltersMenuItem.Checked = false;
-            this.okButton.Enabled = true;
-        }
-
-        #endregion Filter Menu
-
-        #region FilterMenu Interface Events
-
-        private void SortASCMenuItem_MouseEnter(object sender, EventArgs e)
+        private void MenuItem_MouseEnter(object sender, EventArgs e)
         {
             if ((sender as ToolStripMenuItem).Enabled)
                 (sender as ToolStripMenuItem).Select();
@@ -1193,7 +1361,7 @@ namespace ADGV
 
         private void FilterContextMenu_Closed(Object sender, EventArgs e)
         {
-            ClearResizeBox();
+            this.ClearResizeBox();
             this.startingNodes = null;
         }
 
@@ -1203,9 +1371,63 @@ namespace ADGV
                 this.Close();
         }
 
-        private void CheckList_MouseLeave(object sender, EventArgs e)
+        private void okButton_Click(object sender, EventArgs e)
         {
-            this.Focus();
+            this.FiltersMenuItem.Checked = false;
+
+            if (this.allsNode != null && this.allsNode.Checked)
+                CancelFilterMenuItem_Click(null, new EventArgs());
+            else
+            {
+                this.ActiveFilterType = ADGVFilterType.CheckList;
+                string newfilter = "";
+
+                if (this.CheckList.Nodes.Count > 1)
+                {
+                    if (this.CheckList.Nodes.Count > 2 || this.emptysNode == null)
+                    {
+                        String filter = this.CreateFilterString();
+
+                        if (filter.Length > 0)
+                        {
+                            if (this.DataType == ADGVFilterMenuDataType.Boolean)
+                                newfilter = "[{0}]=" + filter;
+                            else if (this.DataType == ADGVFilterMenuDataType.Float)
+                                newfilter = "Convert([{0}],System.String) IN (" + filter + ")";
+                            else
+                                newfilter = "[{0}] IN (" + filter + ")";
+                        }
+                    }
+
+                    if (this.emptysNode != null && this.emptysNode.Checked)
+                    {
+                        if (newfilter != "")
+                            newfilter = "[{0}] IS NULL OR " + newfilter;
+                        else
+                            newfilter = "[{0}] IS NULL";
+                    }
+                    else if (this.DataType == ADGVFilterMenuDataType.Boolean && newfilter == "")
+                    {
+                        newfilter = "[{0}] NOT IS NULL";
+                    }
+                }
+
+                if (newfilter != this.FilterString)
+                {
+                    this.filterNodes = this.CloneNodes(this.CheckList.Nodes);
+                    this.FilterString = newfilter;
+
+                    this.FilterChanged(this, new EventArgs());
+                }
+            }
+            this.Close();
+        }
+
+        private void cancelButton_Click(object sender, EventArgs e)
+        {
+            if (this.checkListChanged)
+                this.LoadNodes(this.startingNodes);
+            this.Close();
         }
 
         private void FiltersMenuItem_Paint(Object sender, PaintEventArgs e)
@@ -1214,15 +1436,21 @@ namespace ADGV
             ControlPaint.DrawMenuGlyph(e.Graphics, rect, MenuGlyph.Arrow, Color.Black, Color.Transparent);
         }
 
-        #endregion FilterMenu Interface Events
+        private void CancelFilterMenuItem_Click(object sender, EventArgs e)
+        {
+            this.ClearFilter();
+            FilterChanged(this, new EventArgs());
+        }
 
-        #region ResizeEvents
+        #endregion Interface Events
+
+        #region Resize Events
 
         private void ResizePictureBox_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
             {
-                ClearResizeBox();
+                this.ClearResizeBox();
             }
         }
 
@@ -1231,7 +1459,7 @@ namespace ADGV
             if (this.Visible)
             {
                 if (e.Button == System.Windows.Forms.MouseButtons.Left)
-                    PaintResizeBox(e.X, e.Y);
+                    this.PaintResizeBox(e.X, e.Y);
             }
         }
 
@@ -1249,7 +1477,7 @@ namespace ADGV
                         newWidth = Math.Max(newWidth, this.MinimumSize.Width);
                         newHeight = Math.Max(newHeight, this.MinimumSize.Height);
 
-                        ResizeMenu(newWidth, newHeight);
+                        this.ResizeMenu(newWidth, newHeight);
                     }
             }
         }
@@ -1288,7 +1516,7 @@ namespace ADGV
             X = Math.Max(X, this.MinimumSize.Width - 1);
             Y = Math.Max(Y, this.MinimumSize.Height - 1);
 
-            Point StartPoint = this.PointToScreen(ADGVFilterMenu.resizeStartPoint);
+            Point StartPoint = this.PointToScreen(new Point(1, 1));
             Point EndPoint = this.PointToScreen(new Point(X, Y));
 
             Rectangle rc = new Rectangle();
@@ -1309,7 +1537,7 @@ namespace ADGV
         {
             if (resizeEndPoint.X != -1)
             {
-                Point StartPoint = this.PointToScreen(ADGVFilterMenu.resizeStartPoint);
+                Point StartPoint = this.PointToScreen(new Point(1, 1));
 
                 Rectangle rc = new Rectangle(StartPoint.X, StartPoint.Y, resizeEndPoint.X, resizeEndPoint.Y);
 
@@ -1326,32 +1554,5 @@ namespace ADGV
         }
 
         #endregion ResizeEvents
-
-        public void SetLoadedFilterMode(Boolean Enabled)
-        {
-            this.SetupFilterMenuItem.Enabled = !Enabled;
-            this.CancelFilterMenuItem.Enabled = Enabled;
-            if (Enabled)
-            {
-                this.activeFilterType = ADGVFilterMenuFilterType.Loaded;
-                this.sortString = null;
-                this.filterString = null;
-                this.filterNodes = null;
-                this.FiltersMenuItem.Checked = false;
-                for (int i = 2; i < FiltersMenuItem.DropDownItems.Count - 1; i++)
-                {
-                    (this.FiltersMenuItem.DropDownItems[i] as ToolStripMenuItem).Checked = false;
-                }
-                this.CheckList.Nodes.Clear();
-                TripleTreeNode allnode = TripleTreeNode.CreateAllsNode(this.RM.GetString("tripletreenode_allnode_text") + "            ");
-                allnode.NodeFont = new Font(this.CheckList.Font, FontStyle.Bold);
-                allnode.CheckState = CheckState.Indeterminate;
-                this.CheckList.Nodes.Add(allnode);
-            }
-            else
-            {
-                this.activeFilterType = ADGVFilterMenuFilterType.None;
-            }
-        }
     }
 }
