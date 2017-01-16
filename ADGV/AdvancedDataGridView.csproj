@@ -94,6 +94,7 @@
     <Compile Include="TripleTreeNode.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Localization\ADGVStrings.de.resx" />
     <EmbeddedResource Include="Localization\ADGVStrings.ru.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>ADGVStrings.ru.Designer.cs</LastGenOutput>
